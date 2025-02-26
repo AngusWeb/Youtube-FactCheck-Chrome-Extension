@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>API Key Settings</title>
+    <style>
+      :root {
+        --main-bg-color: #222;
+        --main-fg-color: #fff;
+        --accent-color: #0275d8;
+        --grey-bg-color: #333;
+        --grey-fg-color: #999;
+        --button-hover-color: #0269c2;
+        --font-family: Arial, sans-serif;
+      }
+
+      body {
+        font-family: var(--font-family);
+        padding: 0;
+        margin: 0;
+        min-width: 300px;
+        background-color: var(--main-bg-color);
+        color: var(--main-fg-color);
+      }
+
+      .container {
+        padding: 16px;
+      }
+
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        padding: 10px 0;
+        font-size: 24px;
+        border-bottom: 2px solid var(--grey-bg-color);
+        margin-bottom: 16px;
+      }
+
+      .header img {
+        margin-right: 10px;
+        width: 32px;
+        height: 32px;
+      }
+
+      .form-group {
+        margin-bottom: 16px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: bold;
+      }
+
+      #apikey {
+        width: 100%;
+        padding: 8px;
+        border-radius: 4px;
+        border: none;
+        background-color: var(--grey-bg-color);
+        color: var(--main-fg-color);
+        box-sizing: border-box;
+        font-size: 14px;
+      }
+
+      .button {
+        width: 100%;
+        padding: 10px;
+        border: none;
+        border-radius: 6px;
+        font-weight: bold;
+        cursor: pointer;
+        font-family: var(--font-family);
+        transition: background-color 0.2s;
+        text-align: center;
+      }
+
+      .primary-button {
+        background-color: var(--accent-color);
+        color: var(--main-fg-color);
+        margin-bottom: 12px;
+      }
+
+      .primary-button:hover {
+        background-color: var(--button-hover-color);
+      }
+
+      .secondary-button {
+        background-color: transparent;
+        color: var(--accent-color);
+        border: 1px solid var(--accent-color);
+      }
+
+      .secondary-button:hover {
+        background-color: rgba(2, 117, 216, 0.1);
+      }
+
+      .status-message {
+        margin-top: 12px;
+        font-size: 14px;
+        color: #28a745;
+        text-align: center;
+        height: 20px;
+      }
+
+      .footer {
+        margin-top: 20px;
+        padding-top: 12px;
+        padding-bottom: 12px;
+        border-top: 1px solid var(--grey-bg-color);
+        text-align: center;
+        font-size: 12px;
+        color: var(--grey-fg-color);
+      }
+
+      .footer a {
+        color: var(--accent-color);
+        text-decoration: none;
+        margin: 0 6px;
+      }
+
+      .footer a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <img src="images/icon48.png" alt="Fact Checker" />
+      <span>Fact Checker</span>
+    </div>
+
+    <div class="container">
+      <div class="form-group">
+        <label for="apikey">API Key:</label>
+        <input type="text" id="apikey" placeholder="Enter your API key" />
+      </div>
+
+      <button id="save" class="button primary-button">Save API Key</button>
+      <button id="getApiKey" class="button secondary-button">
+        How to Obtain a Free API Key
+      </button>
+
+      <div id="status" class="status-message"></div>
+    </div>
+
+    <div class="footer">
+      <!--       <a href="#" id="help">Help</a>
+      <a href="#" id="about">About</a>
+      <a href="https://github.com/yourusername/fact-checker" target="_blank"
+        >GitHub</a
+      > -->
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YouTube Fact Checker - API Key Setup Guide</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      h1 {
+        color: #c00;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+      }
+
+      .step {
+        margin-bottom: 30px;
+        background: #f9f9f9;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .step h2 {
+        margin-top: 0;
+        color: #c00;
+        display: flex;
+        align-items: center;
+      }
+
+      .step-number {
+        background: #c00;
+        color: white;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        margin-right: 10px;
+        font-weight: bold;
+      }
+
+      img {
+        max-width: 100%;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin: 15px 0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .tip {
+        background: #fffde7;
+        padding: 10px 15px;
+        border-left: 4px solid #ffd600;
+        margin: 15px 0;
+      }
+
+      .button-example {
+        font-weight: bold;
+        color: #c00;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>YouTube Fact Checker - API Key Setup Guide</h1>
+
+    <div class="step">
+      <h2><span class="step-number">1</span> Get a Google AI Studio API Key</h2>
+      <p>
+        Visit
+        <a href="https://aistudio.google.com/apikey" target="_blank"
+          >https://aistudio.google.com/apikey</a
+        >
+      </p>
+      <div class="tip">If prompted, sign in to your Google account</div>
+    </div>
+
+    <div class="step">
+      <h2><span class="step-number">2</span> Create Your API Key</h2>
+      <p>Click the <span class="button-example">Create API key</span> button</p>
+      <img
+        src="guide/createapikeybutton.png"
+        alt="Create API Key button screenshot"
+      />
+      <div class="tip">
+        If prompted to select a Google Cloud project, choose one from the
+        dropdown menu
+      </div>
+    </div>
+
+    <div class="step">
+      <h2><span class="step-number">3</span> Copy Your New API Key</h2>
+      <p>
+        Once your API key is generated, click the
+        <span class="button-example">Copy API key</span> button
+      </p>
+      <img
+        src="guide/copyapikeybutton.png"
+        alt="Copy API Key button screenshot"
+      />
+      <div class="tip">
+        Keep this API key secure! Don't share it with others.
+      </div>
+    </div>
+
+    <div class="step">
+      <h2>
+        <span class="step-number">4</span> Pin the Extension to Your Browser
+      </h2>
+      <p>
+        Find and pin the YouTube Fact Checker extension from your browser's
+        extension menu:
+      </p>
+      <ol>
+        <li>
+          Click the extensions icon (puzzle piece) on the right side of your
+          address bar
+        </li>
+        <li>Find "YouTube Fact Checker" in the list</li>
+        <li>Click the pin icon to make it always visible</li>
+      </ol>
+      <img
+        src="guide/extensionpinning.png"
+        alt="Extension pinning screenshot"
+      />
+    </div>
+
+    <div class="step">
+      <h2><span class="step-number">5</span> Configure the Extension</h2>
+      <p>Now set up the extension with your new API key:</p>
+      <ol>
+        <li>Click the YouTube Fact Checker icon in your browser toolbar</li>
+        <li>Paste your API key into the field provided</li>
+        <li>
+          Click the <span class="button-example">Save API Key</span> button
+        </li>
+      </ol>
+      <img
+        src="guide/pasteinfactcheckerextension.png"
+        alt="API pasting screenshot"
+      />
+    </div>
+
+    <div class="step">
+      <h2><span class="step-number">6</span> Start Fact-Checking!</h2>
+      <p>You're all set! Now when watching YouTube videos:</p>
+      <ol>
+        <li>Click the fact-check button on the YouTube player bar</li>
+        <li>View AI-generated fact-checking information in the sidebar</li>
+      </ol>
+      <div class="tip">
+        Remember: AI fact-checking is a helpful tool but always use your own
+        judgment and verify important information from multiple sources.
+      </div>
+    </div>
+  </body>
+</html>

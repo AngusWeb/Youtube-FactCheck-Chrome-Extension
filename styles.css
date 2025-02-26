@@ -1,0 +1,296 @@
+/* styles.css */
+
+/* Style the injected button */
+#my-extension-sidebar {
+  position: fixed;
+  top: 0;
+  right: -520px; /* Slightly wider than before for better content display */
+  width: 500px;
+  height: 100%;
+  background-color: #0f0f0f; /* YouTube dark theme background */
+  color: #f1f1f1; /* YouTube text color */
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
+  padding: 16px;
+  box-sizing: border-box;
+  z-index: 999999;
+  font-family: "Roboto", "YouTube Sans", Arial, sans-serif;
+  overflow-y: auto;
+  transition: right 0.3s cubic-bezier(0.1, 0.5, 0.1, 1); /* YouTube-like animation */
+  border-left: 1px solid #303030; /* Subtle border */
+}
+
+/* When visible, slide into view */
+#my-extension-sidebar.visible {
+  right: 0;
+}
+
+/* Sidebar header */
+#my-extension-sidebar h2 {
+  margin-top: 8px;
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 500;
+  color: #fff;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #303030;
+}
+
+/* Paragraph styling */
+#my-extension-sidebar p {
+  margin-bottom: 12px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* Close button styling */
+#sidebar-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #aaa;
+  transition: color 0.2s ease;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#sidebar-close:hover {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+#sidebar-close:active {
+  transform: scale(0.95);
+}
+
+/* Fact check result container */
+#fact-check-result {
+  background-color: #1f1f1f;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Loading state */
+#fact-check-result.loading {
+  position: relative;
+  min-height: 100px;
+}
+
+#fact-check-result.loading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(255, 0, 0, 0.3);
+  border-top: 3px solid #ff0000;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* Typography enhancements for markdown content */
+.markdown-content h3 {
+  font-size: 16px;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  color: #f1f1f1;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin-left: 20px;
+  margin-bottom: 12px;
+}
+
+.markdown-content li {
+  margin-bottom: 4px;
+}
+
+.markdown-content a {
+  color: #3ea6ff; /* YouTube blue */
+  text-decoration: none;
+}
+
+.markdown-content a:hover {
+  text-decoration: underline;
+}
+
+/* Source citation styling */
+.source-citation {
+  font-size: 12px;
+  color: #aaa;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #303030;
+}
+
+/* Fact check status indicators */
+.fact-status {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.fact-status.true {
+  background-color: rgba(0, 128, 0, 0.2);
+  color: #4ade80;
+}
+
+.fact-status.false {
+  background-color: rgba(255, 0, 0, 0.2);
+  color: #f87171;
+}
+
+.fact-status.partial {
+  background-color: rgba(255, 191, 0, 0.2);
+  color: #fbbf24;
+}
+
+/* Responsive design adjustments */
+@media (max-width: 768px) {
+  #my-extension-sidebar {
+    width: 280px;
+  }
+}
+
+/* When YouTube is in theater mode */
+.ytd-watch-flexy[theater] #my-extension-sidebar {
+  top: 56px; /* YouTube header height */
+}
+
+/* Animation for new content */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.new-content {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.my-custom-button img {
+  /* Force YouTube not to invert the icon */
+  filter: none !important;
+  /* Make sure it's visible */
+  opacity: 1 !important;
+  /* If you need a background just to confirm it's visible: */
+  /* background-color: #fff; */
+}
+.markdown-content {
+  line-height: 1.5;
+
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  margin-top: 20px;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.markdown-content h1 {
+  font-size: 1.8em;
+}
+.markdown-content h2 {
+  font-size: 1.5em;
+}
+.markdown-content h3 {
+  font-size: 1.3em;
+}
+
+.markdown-content p {
+  margin-bottom: 16px;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin-bottom: 16px;
+  padding-left: 20px;
+}
+
+.markdown-content blockquote {
+  border-left: 4px solid #ddd;
+  padding-left: 16px;
+  color: #666;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.markdown-content pre,
+.markdown-content code {
+  background-color: #f6f8fa;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+.markdown-content pre {
+  padding: 16px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+}
+
+.markdown-content code {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 85%;
+}
+
+.markdown-content a {
+  color: #0366d6;
+  text-decoration: none;
+}
+
+.markdown-content a:hover {
+  text-decoration: underline;
+}
+
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.markdown-content table th,
+.markdown-content table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+
+.markdown-content table th {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  text-align: left;
+  background-color: #f2f2f2;
+}
