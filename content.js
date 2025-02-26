@@ -187,11 +187,13 @@ async function callGoogleGenAIStream(
               }
             });
             // Update UI with the accumulated text.
-            onPartialUpdate(accumulatedText);
+            onPartialUpdate(accumulatedText, false); // false indicates this is not the final update
           }
 
           if (serverContent.turnComplete) {
             ws.close();
+            // Call onPartialUpdate with the final flag set to true
+            onPartialUpdate(accumulatedText, true); // true indicates this is the final update
             resolve(accumulatedText);
           }
         } else {
@@ -603,36 +605,39 @@ function injectFactCheckButton() {
           const factCheckResultDiv =
             document.getElementById("fact-check-result");
           // Call the LLM using the streaming function
-          const userPrompt = `IDENTIFY AND ANALYZE CLAIMS:
-   - Identify the main factual claims made in the transcript
-   - Distinguish between objective statements, opinions, and speculative claims
-   - Flag claims that are potentially misleading, false, or require verification
-   - Quote the exact timestamp and claim from the transcript
-For each identified claim:
-  1. EVALUATE CREDIBILITY:
-    - Assess the accuracy of factual statements based on current consensus knowledge
-    - Rate the reliability of each contested claim on a scale (Confirmed, Likely True, Uncertain, Likely False, Demonstrably False)
-    - Highlight when the speaker uses logical fallacies or rhetorical techniques that may mislead viewers
+          const userPrompt = `IDENTIFY KEY CLAIMS:
+- Analyze the entire transcript to identify the most significant factual claims
+- Focus on claims that are central to the video's main argument or repeated frequently
+- Prioritize claims that could potentially misinform viewers if inaccurate
+- Distinguish between factual assertions, opinions, and speculative statements
 
-  2. PROVIDE CONTEXT:
-    - Offer alternative perspectives on controversial topics
-    - Recommend specific, credible sources that address only for uncertain or questionable claims
-    - Present relevant information that may have been omitted
-    - Explain the broader context when necessary for accurate understanding
+FORMAT BY CLAIM:
+For each major claim identified, create a separate section with the following structure:
 
-SUMMARIZE RELIABILITY:
-   - Provide an overall assessment of the transcript's factual accuracy
-   - Highlight the most significant factual issues
-   - Summarize the key alternative viewpoints a viewer should consider
+CLAIM #[number]: "[Direct quote with timestamp]"
 
-Match your response length to the video length:
-Using the highest timestamps (format- minute:seconds) in the transcript identify the videos length. Do not tell me the video length just use it to determine the length of your response.
-   - For videos under 3 minutes: Focus on 1 main claim - Keep your entire response under 400 words
-   - For videos 3-10 minutes: Focus on 2-3 main claims Keep your response under 800 words
-   - For videos over 10 minutes: Focus on a maximum of 5 main claims
-   
+  CREDIBILITY:
+  - Assess accuracy based on current consensus knowledge
+  - Rate reliability: Confirmed, Likely True, Uncertain, Likely False, Demonstrably False
+  - Identify logical fallacies or misleading rhetorical techniques if present
+  
+  CONTEXT:
+  - Provide alternative perspectives on controversial topics
+  - Present relevant information that may have been omitted
+  - Explain broader context necessary for accurate understanding
+  - For uncertain/questionable claims only, recommend specific credible sources
+  
+OVERALL ASSESSMENT:
+- Provide a balanced summary of the video's factual reliability
+- Highlight the most significant factual issues identified
+- Summarize key alternative viewpoints viewers should consider
 
-Please maintain neutrality and avoid political bias in your analysis. Your goal is to help viewers make informed judgments, not to promote any particular viewpoint.`;
+RESPONSE LENGTH GUIDELINES (internal use only):
+- Videos under 3 minutes: Focus on 1 main claim, response under 400 words
+- Videos 3-10 minutes: Focus on 2-3 main claims, response under 800 words
+- Videos over 10 minutes: Focus on maximum of 5 main claims
+
+Maintain neutrality and avoid political bias. Your goal is to help viewers make informed judgments, not promote any particular viewpoint.`;
           console.log(
             "[DEBUG] Sending transcript + prompt to callGoogleGenAIStream..."
           );
@@ -640,7 +645,7 @@ Please maintain neutrality and avoid political bias in your analysis. Your goal 
           let currentFactStatus = "partial"; // Default status
 
           // Callback to update the UI with each incoming chunk.
-          const onPartialUpdate = (accumulatedText) => {
+          const onPartialUpdate = (accumulatedText, isFinal = false) => {
             // Remove loading class once we start getting content
             factCheckResultDiv.classList.remove("loading");
 
@@ -660,9 +665,18 @@ Please maintain neutrality and avoid political bias in your analysis. Your goal 
                 '<div class="fact-status partial">Partially Accurate</div>';
             }
 
-            // Use marked library to convert markdown to HTML
-            factCheckResultDiv.innerHTML =
-              statusHtml + marked.parse(accumulatedText);
+            // If this is the final update, reprocess the entire markdown for clean rendering
+            if (isFinal) {
+              console.log(
+                "[DEBUG] Final response received, refreshing markdown"
+              );
+              factCheckResultDiv.innerHTML =
+                statusHtml + marked.parse(accumulatedText);
+            } else {
+              // For streaming updates, render as we go
+              factCheckResultDiv.innerHTML =
+                statusHtml + marked.parse(accumulatedText);
+            }
           };
 
           try {
@@ -674,8 +688,16 @@ Please maintain neutrality and avoid political bias in your analysis. Your goal 
             );
             console.log("[DEBUG] LLM call complete. Sidebar updated.");
 
-            // Cache the result for future use
-            cacheFactCheckResult(videoId, finalText, currentFactStatus);
+            if (finalText && finalText.length >= 200) {
+              console.log("[DEBUG] Response length sufficient, caching result");
+              cacheFactCheckResult(videoId, finalText, currentFactStatus);
+            } else {
+              console.warn(
+                "[DEBUG] Response too short (length: " +
+                  (finalText ? finalText.length : 0) +
+                  "), not caching"
+              );
+            }
             // Add source citation section if not already present
             if (!document.querySelector(".source-citation")) {
               const sourceSection = document.createElement("div");
