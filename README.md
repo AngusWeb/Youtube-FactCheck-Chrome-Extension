@@ -96,13 +96,8 @@ Once your API key is set, you're ready to start using the extension to receive a
 
 Below is a list of features and improvements planned for future updates:
 
-- Add a "Buy Me a Coffee" button to the extension toolbar.
-- Improve the sidebar so users can view the video while checking facts and have an interface that fits better with YouTube's design.
-- Refine the fact-checking prompt further.
-- Fix issues with opening the transcript when the user presses the button while the page is still loading.
-- Add an AI disclaimer to cached responses.
 - Apply Chrome Developer Docs guidelines to ensure the extension is ready for the Chrome Store.
-- Create an improved icon for the extension.
+
 
 ---
 
