@@ -1,9 +1,9 @@
-
 # YouTube Fact Checker Chrome Extension
 
 Welcome to the **YouTube Fact Checker Chrome Extension**! This extension helps you get AI-generated fact-check responses on YouTube. Simply click the fact-check button on the YouTube playbar during video playback, and a handy sidebar will appear with detailed fact-check information.
 
-> **Note:** This version (0.1) is a testing release.
+> **Note:** version (0.1) is a testing release.
+> This version (0.2 Beta) is a Beta testing release.
 
 ---
 
@@ -15,11 +15,12 @@ Welcome to the **YouTube Fact Checker Chrome Extension**! This extension helps y
    On the right side of this repository’s page, click on the **"Releases"** link (or go directly to the [Releases page](https://github.com/your-username/your-repo/releases) if available).
 
 2. **Download the ZIP File:**  
-   Look for the release titled **"0.1"** and download the `0.1.zip` file by clicking on it.  
+   Look for the release titled **"Beta 0.2"** and download the `FactChecker_0.2_Beta.zip` file by clicking on it.
+
    > **Tip:** If you're new to GitHub, the Releases page is typically found on the right-hand side of the repository or under the "Releases" tab at the top.
 
 3. **Extract the ZIP File:**  
-   Once downloaded, locate the `0.1.zip` file on your computer and extract its contents to a folder you can easily access.
+   Once downloaded, locate the `FactChecker_0.2_Beta.zip` file on your computer and extract its contents to a folder you can easily access.
 
 ---
 
@@ -31,9 +32,10 @@ Welcome to the **YouTube Fact Checker Chrome Extension**! This extension helps y
 2. **Enable Developer Mode:**  
    In the top-right corner of the Extensions page, toggle the **Developer mode** switch to the **On** position.
 
-3. **Load the Unpacked Extension:**  
+3. **Load the Unpacked Extension:**
+
    - Click the **"Load unpacked"** button that appears.
-   - A file dialog will open. Navigate to the folder where you extracted the `0.1.zip` file.
+   - A file dialog will open. Navigate to the folder where you extracted the `FactChecker_0.2_Beta.zip` file.
    - Select the folder and click **"Select Folder"** (or **"Open"** on some systems).
 
 4. **Confirm Installation:**  
@@ -54,7 +56,8 @@ Welcome to the **YouTube Fact Checker Chrome Extension**! This extension helps y
 ### Setting Up Your API Key
 
 1. **Obtain an API Key:**  
-   Follow the instructions in our API Key Guide (press the 'How to obtain API key button)  to sign up and obtain your API key.  
+   Follow the instructions in our API Key Guide (press the 'How to obtain API key button) to sign up and obtain your API key.
+
    > **Note:** An API key is required to fetch AI-generated fact-check responses.
 
 2. **Enter Your API Key:**  
@@ -85,7 +88,7 @@ Once your API key is set, you're ready to start using the extension to receive a
 
 ## Troubleshooting & Tips
 
-- **Extension Not Showing?**  
+- **Extension Not Showing?**
   - Verify that you followed all steps under "Install the Extension in Chrome (Unpacked Mode)".
   - Ensure that Developer Mode is enabled.
   - Try reloading the extension page in Chrome.
@@ -98,7 +101,8 @@ Below is a list of features and improvements planned for future updates:
 
 - Apply Chrome Developer Docs guidelines to ensure the extension is ready for the Chrome Store.
 
-
 ---
+
+```
 
 ```
