@@ -1,27 +1,143 @@
-/* styles.css */
+/* Root variables to handle YouTube themes */
+:root {
+  /* Default to dark theme values */
+  --sidebar-bg: #0f0f0f;
+  --sidebar-text: #f1f1f1;
+  --sidebar-border: #303030;
+  --sidebar-panel-bg: #1f1f1f;
+  --sidebar-muted-text: #aaa;
+  --sidebar-highlight: #3ea6ff;
+  --sidebar-code-bg: #2d2d2d;
+  --sidebar-hover-bg: rgba(255, 255, 255, 0.1);
+  --sidebar-true-color: #66bb6a;
+  --sidebar-false-color: #ef5350;
+  --sidebar-partial-color: #ffc107;
+  --sidebar-true-bg: rgba(46, 125, 50, 0.2);
+  --sidebar-false-bg: rgba(198, 40, 40, 0.2);
+  --sidebar-partial-bg: rgba(251, 192, 45, 0.2);
+  --sidebar-blockquote-color: #aaa;
+}
 
-/* Style the injected button */
+/* Updated light theme detection - YouTube uses multiple classes/attributes */
+html[light],
+html.light-theme,
+html:not([dark]):not(.dark-theme),
+:root.light-theme,
+html[light-theme="true"] {
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #0f0f0f;
+  --sidebar-border: #e5e5e5;
+  --sidebar-panel-bg: #f9f9f9;
+  --sidebar-muted-text: #606060;
+  --sidebar-highlight: #065fd4;
+  --sidebar-code-bg: #f8f8f8;
+  --sidebar-hover-bg: rgba(0, 0, 0, 0.05);
+  --sidebar-true-color: #2e7d32;
+  --sidebar-false-color: #c62828;
+  --sidebar-partial-color: #f57c00;
+  --sidebar-true-bg: rgba(46, 125, 50, 0.1);
+  --sidebar-false-bg: rgba(198, 40, 40, 0.1);
+  --sidebar-partial-bg: rgba(251, 192, 45, 0.1);
+  --sidebar-blockquote-color: #606060;
+}
+
+/* Dark theme detection */
+html[dark],
+html.dark-theme,
+:root.dark-theme,
+html.ytd-app[dark-theme],
+html[dark-theme="true"] {
+  --sidebar-bg: #0f0f0f;
+  --sidebar-text: #f1f1f1;
+  --sidebar-border: #303030;
+  --sidebar-panel-bg: #1f1f1f;
+  --sidebar-muted-text: #aaa;
+  --sidebar-highlight: #3ea6ff;
+  --sidebar-code-bg: #2d2d2d;
+  --sidebar-hover-bg: rgba(255, 255, 255, 0.1);
+  --sidebar-true-color: #66bb6a;
+  --sidebar-false-color: #ef5350;
+  --sidebar-partial-color: #ffc107;
+  --sidebar-true-bg: rgba(46, 125, 50, 0.2);
+  --sidebar-false-bg: rgba(198, 40, 40, 0.2);
+  --sidebar-partial-bg: rgba(251, 192, 45, 0.2);
+  --sidebar-blockquote-color: #aaa;
+}
+
+/* Theme class-specific styling */
+#my-extension-sidebar.light-theme {
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #0f0f0f;
+  --sidebar-border: #e5e5e5;
+  --sidebar-panel-bg: #f9f9f9;
+  --sidebar-muted-text: #606060;
+  --sidebar-highlight: #065fd4;
+  --sidebar-code-bg: #f8f8f8;
+  --sidebar-hover-bg: rgba(0, 0, 0, 0.05);
+  --sidebar-true-color: #2e7d32;
+  --sidebar-false-color: #c62828;
+  --sidebar-partial-color: #f57c00;
+  --sidebar-true-bg: rgba(46, 125, 50, 0.1);
+  --sidebar-false-bg: rgba(198, 40, 40, 0.1);
+  --sidebar-partial-bg: rgba(251, 192, 45, 0.1);
+  --sidebar-blockquote-color: #606060;
+
+  background-color: #ffffff !important;
+  color: #0f0f0f !important;
+  border-left: 1px solid #e5e5e5 !important;
+}
+
+#my-extension-sidebar.dark-theme {
+  --sidebar-bg: #0f0f0f;
+  --sidebar-text: #f1f1f1;
+  --sidebar-border: #303030;
+  --sidebar-panel-bg: #1f1f1f;
+  --sidebar-muted-text: #aaa;
+  --sidebar-highlight: #3ea6ff;
+  --sidebar-code-bg: #2d2d2d;
+  --sidebar-hover-bg: rgba(255, 255, 255, 0.1);
+  --sidebar-true-color: #66bb6a;
+  --sidebar-false-color: #ef5350;
+  --sidebar-partial-color: #ffc107;
+  --sidebar-true-bg: rgba(46, 125, 50, 0.2);
+  --sidebar-false-bg: rgba(198, 40, 40, 0.2);
+  --sidebar-partial-bg: rgba(251, 192, 45, 0.2);
+  --sidebar-blockquote-color: #aaa;
+
+  background-color: #0f0f0f !important;
+  color: #f1f1f1 !important;
+  border-left: 1px solid #303030 !important;
+}
+
+/* Adjust the sidebar position to overlay the secondary content exactly */
 #my-extension-sidebar {
   position: fixed;
-  top: 0;
-  right: -520px; /* Slightly wider than before for better content display */
-  width: 500px;
-  height: 100%;
-  background-color: #0f0f0f; /* YouTube dark theme background */
-  color: #f1f1f1; /* YouTube text color */
+  top: 56px; /* Account for YouTube header */
+  right: -426px; /* Default, will be dynamically set in JS */
+  height: calc(100vh - 56px); /* Full height minus header */
+  width: 426px; /* Default width, will be dynamically updated */
+  background-color: var(--sidebar-bg);
+  color: var(--sidebar-text);
   box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
   padding: 16px;
   box-sizing: border-box;
-  z-index: 999999;
-  font-family: "Roboto", "YouTube Sans", Arial, sans-serif;
-  overflow-y: auto;
+  z-index: 2001; /* High enough to show over YouTube UI */
+  font-family: "Roboto", "YouTube Sans", system-ui, -apple-system, sans-serif;
+  overflow-y: auto; /* Enable vertical scrolling */
   transition: right 0.3s cubic-bezier(0.1, 0.5, 0.1, 1); /* YouTube-like animation */
-  border-left: 1px solid #303030; /* Subtle border */
+  border-left: 1px solid var(--sidebar-border);
 }
 
-/* When visible, slide into view */
+/* Important: This makes the sidebar visible when the class is added */
 #my-extension-sidebar.visible {
-  right: 0;
+  right: 0 !important; /* Use !important to override inline styles */
+}
+
+/* Paragraph styling */
+#my-extension-sidebar p {
+  margin-bottom: 12px;
+  font-size: 16px;
+  line-height: 1.4;
 }
 
 /* Sidebar header */
@@ -30,16 +146,9 @@
   margin-bottom: 16px;
   font-size: 18px;
   font-weight: 500;
-  color: #fff;
+  color: var(--sidebar-text);
   padding-bottom: 10px;
-  border-bottom: 1px solid #303030;
-}
-
-/* Paragraph styling */
-#my-extension-sidebar p {
-  margin-bottom: 12px;
-  font-size: 14px;
-  line-height: 1.4;
+  border-bottom: 1px solid var(--sidebar-border);
 }
 
 /* Close button styling */
@@ -51,28 +160,80 @@
   border: none;
   font-size: 20px;
   cursor: pointer;
-  color: #aaa;
-  transition: color 0.2s ease;
+  color: var(--sidebar-muted-text);
+  transition: color 0.2s ease, background-color 0.2s ease;
   width: 32px;
   height: 32px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 2002; /* Make sure it's above the sidebar */
 }
 
 #sidebar-close:hover {
-  color: #fff;
-  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--sidebar-text);
+  background-color: var(--sidebar-hover-bg);
 }
 
-#sidebar-close:active {
-  transform: scale(0.95);
+/* Fact status indicators with YouTube-like styling */
+.fact-status {
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border-radius: 4px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.fact-status:before {
+  content: "";
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  border-radius: 50%;
+}
+
+.fact-status.true {
+  background-color: var(--sidebar-true-bg);
+  color: var(--sidebar-true-color);
+}
+
+.fact-status.true:before {
+  background-color: var(--sidebar-true-color);
+}
+
+.fact-status.false {
+  background-color: var(--sidebar-false-bg);
+  color: var(--sidebar-false-color);
+}
+
+.fact-status.false:before {
+  background-color: var(--sidebar-false-color);
+}
+
+.fact-status.partial {
+  background-color: var(--sidebar-partial-bg);
+  color: var(--sidebar-partial-color);
+}
+
+.fact-status.partial:before {
+  background-color: var(--sidebar-partial-color);
+}
+
+/* Source citation styling */
+.source-citation {
+  font-size: 12px;
+  color: var(--sidebar-muted-text);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--sidebar-border);
 }
 
 /* Fact check result container */
 #fact-check-result {
-  background-color: #1f1f1f;
+  background-color: var(--sidebar-panel-bg);
   border-radius: 8px;
   padding: 16px;
   margin-top: 12px;
@@ -109,104 +270,23 @@
   }
 }
 
-/* Typography enhancements for markdown content */
-.markdown-content h3 {
-  font-size: 16px;
-  margin-top: 16px;
-  margin-bottom: 8px;
-  color: #f1f1f1;
-}
-
-.markdown-content ul,
-.markdown-content ol {
-  margin-left: 20px;
-  margin-bottom: 12px;
-}
-
-.markdown-content li {
-  margin-bottom: 4px;
-}
-
-.markdown-content a {
-  color: #3ea6ff; /* YouTube blue */
-  text-decoration: none;
-}
-
-.markdown-content a:hover {
-  text-decoration: underline;
-}
-
-/* Source citation styling */
-.source-citation {
-  font-size: 12px;
-  color: #aaa;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #303030;
-}
-
-/* Fact check status indicators */
-.fact-status {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  margin-bottom: 12px;
-}
-
-.fact-status.true {
-  background-color: rgba(0, 128, 0, 0.2);
-  color: #4ade80;
-}
-
-.fact-status.false {
-  background-color: rgba(255, 0, 0, 0.2);
-  color: #f87171;
-}
-
-.fact-status.partial {
-  background-color: rgba(255, 191, 0, 0.2);
-  color: #fbbf24;
-}
-
-/* Responsive design adjustments */
-@media (max-width: 768px) {
+/* Responsive adjustments for different screen sizes */
+@media (max-width: 1000px) {
   #my-extension-sidebar {
-    width: 280px;
+    width: 360px !important; /* Override JS width on smaller screens */
   }
 }
 
-/* When YouTube is in theater mode */
-.ytd-watch-flexy[theater] #my-extension-sidebar {
-  top: 56px; /* YouTube header height */
-}
-
-/* Animation for new content */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
+@media (max-width: 600px) {
+  #my-extension-sidebar {
+    width: 100% !important; /* Full width on very small screens */
+    right: -100%;
   }
 }
 
-.new-content {
-  animation: fadeIn 0.3s ease-in-out;
-}
-
-.my-custom-button img {
-  /* Force YouTube not to invert the icon */
-  filter: none !important;
-  /* Make sure it's visible */
-  opacity: 1 !important;
-  /* If you need a background just to confirm it's visible: */
-  /* background-color: #fff; */
-}
+/* Markdown content styling */
 .markdown-content {
   line-height: 1.5;
-
   padding: 10px;
   overflow-y: auto;
 }
@@ -217,14 +297,17 @@
   margin-top: 20px;
   margin-bottom: 10px;
   font-weight: 600;
+  color: var(--sidebar-text);
 }
 
 .markdown-content h1 {
   font-size: 1.8em;
 }
+
 .markdown-content h2 {
   font-size: 1.5em;
 }
+
 .markdown-content h3 {
   font-size: 1.3em;
 }
@@ -240,16 +323,16 @@
 }
 
 .markdown-content blockquote {
-  border-left: 4px solid #ddd;
+  border-left: 4px solid var(--sidebar-highlight);
   padding-left: 16px;
-  color: #666;
+  color: var(--sidebar-blockquote-color);
   margin-left: 0;
   margin-right: 0;
 }
 
 .markdown-content pre,
 .markdown-content code {
-  background-color: #f6f8fa;
+  background-color: var(--sidebar-code-bg);
   border-radius: 3px;
   font-family: monospace;
 }
@@ -265,10 +348,11 @@
   padding: 0.2em 0.4em;
   margin: 0;
   font-size: 85%;
+  color: var(--sidebar-text);
 }
 
 .markdown-content a {
-  color: #0366d6;
+  color: var(--sidebar-highlight);
   text-decoration: none;
 }
 
@@ -284,7 +368,7 @@
 
 .markdown-content table th,
 .markdown-content table td {
-  border: 1px solid #ddd;
+  border: 1px solid var(--sidebar-border);
   padding: 8px;
 }
 
@@ -292,5 +376,73 @@
   padding-top: 12px;
   padding-bottom: 12px;
   text-align: left;
-  background-color: #f2f2f2;
+  background-color: var(--sidebar-panel-bg);
+}
+
+/* Source citation and disclaimer */
+.source-citation,
+.disclaimer-container {
+  margin-top: 20px;
+  padding: 12px;
+  border-radius: 8px;
+  background-color: var(--sidebar-panel-bg);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--sidebar-muted-text);
+}
+
+.cached-notice {
+  margin-top: 15px;
+  font-style: italic;
+  font-size: 12px;
+  opacity: 0.8;
+  color: var(--sidebar-muted-text);
+}
+
+/* YouTube content adjustments when sidebar is visible */
+.sidebar-active #secondary {
+  display: none !important;
+}
+
+.sidebar-active #primary {
+  width: calc(100% - 402px) !important;
+  max-width: none !important;
+}
+
+/* Mobile adjustments */
+@media (max-width: 800px) {
+  .sidebar-active #primary {
+    width: 100% !important;
+  }
+}
+
+#my-extension-sidebar.light-theme .source-citation,
+#my-extension-sidebar.light-theme .disclaimer-container {
+  background-color: var(--sidebar-panel-bg);
+  color: var(--sidebar-muted-text);
+}
+
+#my-extension-sidebar.dark-theme .source-citation,
+#my-extension-sidebar.dark-theme .disclaimer-container {
+  background-color: var(--sidebar-panel-bg);
+  color: var(--sidebar-muted-text);
+}
+
+/* Ensure the close button respects the theme */
+#my-extension-sidebar.light-theme #sidebar-close {
+  color: var(--sidebar-muted-text);
+}
+
+#my-extension-sidebar.light-theme #sidebar-close:hover {
+  color: var(--sidebar-text);
+  background-color: var(--sidebar-hover-bg);
+}
+
+#my-extension-sidebar.dark-theme #sidebar-close {
+  color: var(--sidebar-muted-text);
+}
+
+#my-extension-sidebar.dark-theme #sidebar-close:hover {
+  color: var(--sidebar-text);
+  background-color: var(--sidebar-hover-bg);
 }

@@ -4,24 +4,32 @@ document.addEventListener("DOMContentLoaded", function () {
   const saveButton = document.getElementById("save");
   const getApiKeyButton = document.getElementById("getApiKey");
   const statusMessage = document.getElementById("status");
+  const pasteButton = document.getElementById("paste-button");
 
   // Optional elements - check if they exist before adding listeners
   const helpButton = document.getElementById("help");
   const aboutButton = document.getElementById("about");
 
   // Check if required elements exist
-  if (!apiKeyInput || !saveButton || !getApiKeyButton || !statusMessage) {
+  if (
+    !apiKeyInput ||
+    !saveButton ||
+    !getApiKeyButton ||
+    !statusMessage ||
+    !pasteButton
+  ) {
     console.error("Required elements not found in popup.html");
     return;
   }
 
-  // Load any previously saved API key and display it
+  // Load any previously saved API key
   chrome.storage.sync.get("apiKey", function (data) {
     if (data.apiKey) {
-      // Show a masked version of the API key for security
-      const maskedKey = maskAPIKey(data.apiKey);
-      apiKeyInput.value = maskedKey;
+      // Don't display the masked key, leave field empty and update placeholder
+      apiKeyInput.value = "";
       apiKeyInput.dataset.original = data.apiKey;
+      // Change placeholder to indicate API is stored
+      apiKeyInput.placeholder = "API ALREADY STORED";
     }
   });
 
@@ -40,11 +48,28 @@ document.addEventListener("DOMContentLoaded", function () {
       // Show success message
       showStatus("API key saved successfully!", "success");
 
-      // Update the masked display
-      const maskedKey = maskAPIKey(apiKey);
-      apiKeyInput.value = maskedKey;
+      // Clear input field and update placeholder
+      apiKeyInput.value = "";
       apiKeyInput.dataset.original = apiKey;
+      // Update placeholder
+      apiKeyInput.placeholder = "API ALREADY STORED";
     });
+  });
+
+  // Paste button click event
+  pasteButton.addEventListener("click", function () {
+    // Use clipboard API to paste text
+    navigator.clipboard
+      .readText()
+      .then((text) => {
+        apiKeyInput.value = text.trim();
+        apiKeyInput.dataset.original = ""; // Clear the original value to treat this as a new input
+        apiKeyInput.focus();
+      })
+      .catch((err) => {
+        showStatus("Unable to paste from clipboard", "error");
+        console.error("Failed to read clipboard: ", err);
+      });
   });
 
   // Get API Key button click event
@@ -66,17 +91,15 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  // Focus event - when user clicks on masked input, show empty field for new entry
+  // Focus event - no need to change anything now since field is already empty
   apiKeyInput.addEventListener("focus", function () {
-    if (apiKeyInput.dataset.original) {
-      apiKeyInput.value = "";
-    }
+    // Field is already empty, no need to clear it
   });
 
-  // Blur event - when user leaves input without changing, show masked key again
+  // Blur event - keep field empty when losing focus to show placeholder
   apiKeyInput.addEventListener("blur", function () {
     if (apiKeyInput.dataset.original && apiKeyInput.value === "") {
-      apiKeyInput.value = maskAPIKey(apiKeyInput.dataset.original);
+      // Keep the field empty to show the placeholder
     }
   });
 
@@ -107,3 +130,10 @@ document.addEventListener("DOMContentLoaded", function () {
     }, 3000);
   }
 });
+const buyMeCoffeeButton = document.getElementById("buyMeCoffee");
+if (buyMeCoffeeButton) {
+  buyMeCoffeeButton.addEventListener("click", function () {
+    // Replace with your actual Buy Me a Coffee username
+    chrome.tabs.create({ url: "https://buymeacoffee.com/angusdev" });
+  });
+}

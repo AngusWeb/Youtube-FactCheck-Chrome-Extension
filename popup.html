@@ -53,15 +53,35 @@
         font-weight: bold;
       }
 
-      #apikey {
+      .input-with-button {
+        display: flex;
         width: 100%;
+      }
+
+      #apikey {
+        flex: 1;
         padding: 8px;
-        border-radius: 4px;
+        border-radius: 4px 0 0 4px;
         border: none;
         background-color: var(--grey-bg-color);
         color: var(--main-fg-color);
         box-sizing: border-box;
         font-size: 14px;
+      }
+
+      #paste-button {
+        padding: 8px 12px;
+        background-color: var(--grey-bg-color);
+        color: var(--main-fg-color);
+        border: none;
+        border-radius: 0 4px 4px 0;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        font-size: 14px;
+      }
+
+      #paste-button:hover {
+        background-color: var(--button-hover-color);
       }
 
       .button {
@@ -123,18 +143,47 @@
       .footer a:hover {
         text-decoration: underline;
       }
+
+      .coffee-container {
+        margin-top: 20px;
+        text-align: center;
+      }
+
+      .coffee-button {
+        background-color: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 5px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .coffee-button:hover {
+        opacity: 0.8;
+      }
+
+      .coffee-image {
+        width: auto;
+        height: 36px;
+        border-radius: 8px;
+      }
     </style>
   </head>
   <body>
     <div class="header">
-      <img src="images/icon48.png" alt="Fact Checker" />
+      <img src="icons/my-icon-red.png" alt="Fact Checker" />
       <span>Fact Checker</span>
     </div>
 
     <div class="container">
       <div class="form-group">
         <label for="apikey">API Key:</label>
-        <input type="text" id="apikey" placeholder="Enter your API key" />
+        <div class="input-with-button">
+          <input type="text" id="apikey" placeholder="Enter your API key" />
+          <button id="paste-button" title="Paste from clipboard">Paste</button>
+        </div>
       </div>
 
       <button id="save" class="button primary-button">Save API Key</button>
@@ -144,7 +193,15 @@
 
       <div id="status" class="status-message"></div>
     </div>
-
+    <div class="coffee-container">
+      <button id="buyMeCoffee" class="button coffee-button">
+        <img
+          src="images/coffee.png"
+          alt="Buy Me a Coffee"
+          class="coffee-image"
+        />
+      </button>
+    </div>
     <div class="footer">
       <!--       <a href="#" id="help">Help</a>
       <a href="#" id="about">About</a>
