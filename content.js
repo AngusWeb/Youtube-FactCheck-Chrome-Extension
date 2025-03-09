@@ -7,6 +7,14 @@ try {
   cachedIconUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAU..."; // fallback
 }
 
+let cachedIconUrl2;
+try {
+  cachedIconUrl2 = chrome.runtime.getURL("icons/my-icon-white-2.png");
+} catch (error) {
+  console.error("[DEBUG] Could not get icon URL:", error);
+  cachedIconUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAU..."; // fallback
+}
+
 // Global state
 let isActive = true;
 const factCheckCache = {};
@@ -85,11 +93,29 @@ function resetUI() {
     toggleSidebar(false);
   }
 
-  // Remove any existing button to prevent duplicates
-  const existingButton = document.querySelector(".my-custom-button");
-  if (existingButton) {
-    existingButton.parentElement.remove();
-    console.log("[DEBUG] Removed existing button");
+  // Remove any existing buttons to prevent duplicates
+  const existingFirstButton = document.querySelector(".my-custom-button");
+  const existingSecondButton = document.querySelector(".my-second-button");
+
+  if (existingFirstButton && existingFirstButton.parentElement) {
+    // If the parent element contains both buttons, remove the entire container
+    if (
+      existingFirstButton.parentElement.classList.contains(
+        "custom-buttons-container"
+      )
+    ) {
+      existingFirstButton.parentElement.remove();
+      console.log("[DEBUG] Removed existing button container");
+    } else {
+      existingFirstButton.remove();
+      console.log("[DEBUG] Removed existing first button");
+    }
+  }
+
+  if (existingSecondButton && !existingFirstButton) {
+    // In case the second button exists but not within a container with the first button
+    existingSecondButton.remove();
+    console.log("[DEBUG] Removed existing second button");
   }
 
   // Ensure body class is removed
@@ -681,6 +707,244 @@ async function getTranscriptWithRetry(videoId, userApiKey) {
 
   return transcript;
 }
+function getCurrentVideoTimeWindow() {
+  const video = document.querySelector("video");
+  if (!video) {
+    console.warn("[DEBUG] No video element found");
+    return null;
+  }
+
+  // Get current time in seconds
+  const currentTime = video.currentTime;
+
+  // Calculate start time (2 minutes before current position)
+  const startTime = Math.max(0, currentTime - 120); // Don't go below 0
+
+  return {
+    startTime: startTime,
+    endTime: currentTime,
+    formattedStart: formatTimeStamp(startTime),
+    formattedEnd: formatTimeStamp(currentTime),
+  };
+}
+
+function formatTimeStamp(timeInSeconds) {
+  const hours = Math.floor(timeInSeconds / 3600);
+  const minutes = Math.floor((timeInSeconds % 3600) / 60);
+  const seconds = Math.floor(timeInSeconds % 60);
+
+  if (hours > 0) {
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  } else {
+    return `${minutes.toString().padStart(2, "0")}:${seconds
+      .toString()
+      .padStart(2, "0")}`;
+  }
+}
+function getYouTubeTranscriptSegment(startTimeSeconds, endTimeSeconds) {
+  console.log(
+    `[DEBUG] Getting transcript segment from ${startTimeSeconds}s to ${endTimeSeconds}s...`
+  );
+
+  const transcriptContainer = document.querySelector(
+    "ytd-transcript-segment-list-renderer"
+  );
+  if (!transcriptContainer) {
+    console.warn("[DEBUG] Transcript container NOT found in DOM.");
+    return "";
+  }
+  console.log("[DEBUG] Transcript container FOUND in DOM.");
+
+  const segments = transcriptContainer.querySelectorAll(
+    "ytd-transcript-segment-renderer"
+  );
+  console.log("[DEBUG] Found", segments.length, "transcript segments.");
+
+  let transcriptText = "";
+  let segmentCount = 0;
+
+  segments.forEach((segment) => {
+    try {
+      // Extract timestamp from the segment
+      const timestampEl = segment.querySelector(".segment-timestamp");
+      if (!timestampEl) {
+        console.warn("[DEBUG] No timestamp element found in segment");
+        return; // Skip if no timestamp found
+      }
+
+      // Convert timestamp (e.g., "0:01") to seconds
+      const timestampText = timestampEl.textContent.trim();
+      const segmentTimeInSeconds =
+        convertYouTubeTimestampToSeconds(timestampText);
+
+      // Check if this segment is within our time window
+      if (
+        segmentTimeInSeconds >= startTimeSeconds &&
+        segmentTimeInSeconds <= endTimeSeconds
+      ) {
+        const textEl = segment.querySelector(
+          "yt-formatted-string.segment-text"
+        );
+        if (textEl) {
+          // Add timestamp to each segment for context
+          transcriptText += `[${timestampText}] ${textEl.textContent.trim()} `;
+          segmentCount++;
+        } else {
+          console.warn(
+            "[DEBUG] No text element found for segment at timestamp",
+            timestampText
+          );
+        }
+      }
+    } catch (error) {
+      console.error("[DEBUG] Error processing transcript segment:", error);
+    }
+  });
+
+  console.log(`[DEBUG] Found ${segmentCount} segments in the time window`);
+  console.log("[DEBUG] Segment transcript text length:", transcriptText.length);
+
+  return transcriptText.trim();
+}
+function convertYouTubeTimestampToSeconds(timestamp) {
+  try {
+    // Handle different formats: "0:01", "1:23", "12:34", "1:23:45"
+    const parts = timestamp.split(":").map((part) => parseInt(part.trim(), 10));
+
+    if (parts.length === 3) {
+      // Hours:Minutes:Seconds format (e.g., "1:23:45")
+      return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    } else if (parts.length === 2) {
+      // Minutes:Seconds format (e.g., "1:23")
+      return parts[0] * 60 + parts[1];
+    } else if (parts.length === 1) {
+      // Seconds only (e.g., "42")
+      return parts[0];
+    } else {
+      console.warn("[DEBUG] Invalid timestamp format:", timestamp);
+      return 0;
+    }
+  } catch (error) {
+    console.error(
+      "[DEBUG] Error converting timestamp:",
+      error,
+      "for timestamp:",
+      timestamp
+    );
+    return 0;
+  }
+}
+function getYouTubeTranscriptSegmentByTime(startTimeSeconds, endTimeSeconds) {
+  // Try the timestamp-based method first
+  const segmentByTimestamp = getYouTubeTranscriptSegment(
+    startTimeSeconds,
+    endTimeSeconds
+  );
+
+  if (segmentByTimestamp && segmentByTimestamp.length > 0) {
+    return segmentByTimestamp;
+  }
+
+  console.log(
+    "[DEBUG] Timestamp-based extraction failed. Trying alternate method..."
+  );
+
+  // Fallback: Get the full transcript and filter by estimated time windows
+  const transcriptContainer = document.querySelector(
+    "ytd-transcript-segment-list-renderer"
+  );
+  if (!transcriptContainer) {
+    console.warn("[DEBUG] Transcript container NOT found in DOM.");
+    return "";
+  }
+
+  // Get all segments
+  const segments = Array.from(
+    transcriptContainer.querySelectorAll("ytd-transcript-segment-renderer")
+  );
+
+  // If we can't find segments using the normal method, try a more general approach
+  if (!segments || segments.length === 0) {
+    console.warn(
+      "[DEBUG] No transcript segments found with standard selector."
+    );
+    return getFullTranscriptAndApproximateSegment(
+      startTimeSeconds,
+      endTimeSeconds
+    );
+  }
+
+  console.log("[DEBUG] Found", segments.length, "total transcript segments");
+
+  // Find an approximate mapping of timestamps to positions in the transcript
+  // First, collect all timestamps we can find
+  const timestampMap = [];
+
+  segments.forEach((segment, index) => {
+    try {
+      const timestampEl = segment.querySelector(".segment-timestamp");
+      if (timestampEl) {
+        const timestampText = timestampEl.textContent.trim();
+        const timeInSeconds = convertYouTubeTimestampToSeconds(timestampText);
+        timestampMap.push({
+          index: index,
+          time: timeInSeconds,
+          text:
+            segment
+              .querySelector("yt-formatted-string.segment-text")
+              ?.textContent.trim() || "",
+        });
+      }
+    } catch (error) {
+      // Skip problematic segments
+    }
+  });
+
+  // Sort by time
+  timestampMap.sort((a, b) => a.time - b.time);
+
+  // Find start and end indices that cover our time window
+  let startIndex = -1;
+  let endIndex = -1;
+
+  for (let i = 0; i < timestampMap.length; i++) {
+    if (timestampMap[i].time >= startTimeSeconds && startIndex === -1) {
+      startIndex = i;
+    }
+    if (timestampMap[i].time > endTimeSeconds && endIndex === -1) {
+      endIndex = i;
+      break;
+    }
+  }
+
+  // If we couldn't find the end, use the last available segment
+  if (endIndex === -1) {
+    endIndex = timestampMap.length - 1;
+  }
+
+  // If we couldn't find the start, use the first segment
+  if (startIndex === -1) {
+    startIndex = 0;
+  }
+
+  // Extract the segment text
+  let segmentText = "";
+  for (let i = startIndex; i <= endIndex; i++) {
+    segmentText += `[${formatTimeStamp(timestampMap[i].time)}] ${
+      timestampMap[i].text
+    } `;
+  }
+
+  console.log(
+    `[DEBUG] Extracted ${
+      endIndex - startIndex + 1
+    } segments using fallback method`
+  );
+
+  return segmentText.trim();
+}
 
 // ===== CACHE MANAGEMENT =====
 
@@ -1212,81 +1476,216 @@ IMPORTANT:
     console.error("[DEBUG] Error calling LLM:", error);
   }
 }
+async function processSegmentFactCheck(timeWindow, userApiKey, videoId) {
+  console.log(
+    `[DEBUG] Processing fact check for ${timeWindow.formattedStart} to ${timeWindow.formattedEnd}`
+  );
 
-async function handleFactCheck(videoId, userApiKey) {
-  // Clear any existing timeout
-  if (factCheckTimeoutId !== null) {
-    clearTimeout(factCheckTimeoutId);
-    factCheckTimeoutId = null;
-  }
+  // Initialize the enhanced sidebar with loading state
+  sidebar.innerHTML = `
+    <button id="sidebar-close" aria-label="Close Sidebar">&times;</button>
+    <h2>Segment Fact Check</h2>
+    <div id="fact-check-container">
+      <div id="video-info">
+        <div id="current-timestamp">Segment: ${timeWindow.formattedStart} - ${timeWindow.formattedEnd}</div>
+      </div>
+      <div id="fact-check-result" class="markdown-content loading">
+        <div class="fact-status partial">Analyzing Segment...</div>
+      </div>
+    </div>
+  `;
 
-  // Set the fact checking status
-  factCheckingInProgress = true;
+  const factCheckResultDiv = document.getElementById("fact-check-result");
 
-  // Start a new timeout for this fact check attempt
-  factCheckTimeoutId = setTimeout(() => {
-    // Only proceed if we're still loading
-    if (factCheckingInProgress) {
-      console.log("[DEBUG] Fact check timeout reached. Restarting process...");
-      factCheckingInProgress = false;
-      factCheckTimeoutId = null;
+  // Get transcript with retry logic
+  await clickMoreButton();
+  await clickShowTranscript();
 
-      // Update the sidebar to show we're restarting
-      const factCheckResultDiv = document.getElementById("fact-check-result");
-      if (factCheckResultDiv) {
-        factCheckResultDiv.classList.add("loading");
-        factCheckResultDiv.innerHTML = `
-          <div class="fact-status partial">Restarting Analysis...</div>
-          <p>The previous attempt took too long. Restarting fact check process...</p>
-        `;
-      }
+  // Wait a bit for transcript to load
+  await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      // Retry the fact check
-      setTimeout(() => {
-        handleFactCheck(videoId, userApiKey);
-      }, 1000); // Wait a second before restarting
-    }
-  }, FACT_CHECK_TIMEOUT);
+  // Try to get the transcript segment using our improved function
+  const transcript = getYouTubeTranscriptSegmentByTime(
+    timeWindow.startTime,
+    timeWindow.endTime
+  );
 
-  // Check if we have a cached result
-  const cachedResult = await getCachedFactCheck(videoId);
-
-  if (cachedResult) {
-    console.log("[DEBUG] Using cached fact check result");
-    factCheckingInProgress = false;
-    clearTimeout(factCheckTimeoutId); // Clear the timeout since we have a result
-    factCheckTimeoutId = null;
-    displayCachedFactCheck(cachedResult);
+  if (!transcript || transcript.length === 0) {
+    factCheckResultDiv.classList.remove("loading");
+    factCheckResultDiv.innerHTML = `
+      <div class="fact-status false">Error</div>
+      <p>Couldn't find transcript segments for the time window ${timeWindow.formattedStart} - ${timeWindow.formattedEnd}.</p>
+      <p>Make sure the transcript is available and try again.</p>
+      <p>If this error persists, please try the full video fact check instead.</p>
+    `;
     return;
   }
 
-  // Get transcript with retry logic
-  const transcript = await getTranscriptWithRetry(videoId, userApiKey);
+  // If the transcript is too short, it might be a parsing issue - try to get the full transcript as backup
+  if (transcript.length < 50) {
+    console.warn(
+      "[DEBUG] Transcript segment is suspiciously short. Getting full transcript as backup."
+    );
+    const fullTranscript = getYouTubeTranscript();
 
-  if (transcript && transcript.length > 0) {
-    await processFactCheck(transcript, userApiKey, videoId);
-    factCheckingInProgress = false;
-    clearTimeout(factCheckTimeoutId); // Clear the timeout since we have completed
-    factCheckTimeoutId = null;
-  } else {
-    factCheckingInProgress = false;
-    clearTimeout(factCheckTimeoutId); // Clear the timeout since we've hit an error condition
-    factCheckTimeoutId = null;
+    factCheckResultDiv.innerHTML = `
+      <div class="fact-status partial">Limited Segment Data</div>
+      <p>Limited transcript data found for the segment ${timeWindow.formattedStart} - ${timeWindow.formattedEnd}.</p>
+      <p>Using available data for analysis, but results may be limited.</p>
+    `;
 
-    // Update sidebar with error message about transcript unavailability
-    const factCheckResultDiv = document.getElementById("fact-check-result");
-    if (factCheckResultDiv) {
+    // If we have a full transcript, continue with the segment we found
+    // If not, abort
+    if (!fullTranscript || fullTranscript.length === 0) {
       factCheckResultDiv.classList.remove("loading");
       factCheckResultDiv.innerHTML = `
         <div class="fact-status false">Error</div>
-        <p>We couldn't obtain the transcript for this video. Please try one of the following:</p>
-        <ul>
-          <li>Check if this video has captions/transcript available</li>
-          <li>Try opening the transcript manually and then clicking the fact check button again</li>
-          <li>Refresh the page and try again</li>
-        </ul>
+        <p>Couldn't retrieve a usable transcript for this video.</p>
+        <p>Please make sure captions/transcript is available for this video.</p>
       `;
+      return;
     }
+  }
+
+  console.log(
+    `[DEBUG] Using transcript segment with length: ${transcript.length}`
+  );
+
+  const userPrompt = `# FACT-CHECKING YOUTUBE VIDEO SEGMENT
+
+Analyze this transcript segment from ${timeWindow.formattedStart} to ${timeWindow.formattedEnd} in the video.
+Focus ONLY on claims made within this specific time segment.
+
+## FORMAT EACH CLAIM AS FOLLOWS:
+
+### CLAIM #[number]: "[Direct quote]" [TIMESTAMP]
+
+#### VERDICT:
+- **Rating**: [Correct | Partially Correct | Incorrect | Misleading]
+- **Explanation**: Provide a clear 2-3 sentence explanation of why this claim is true, false, or partially accurate, focusing on factual evidence.
+
+#### EVIDENCE:
+- Cite 2-3 relevant authoritative sources that verify or refute the claim
+- Format each source as: "[Source name] ([Publication date]): [Brief description of relevant finding]"
+
+## OVERALL ASSESSMENT:
+
+### SUMMARY:
+- Provide a brief summary of this segment's factual reliability (2-3 sentences)
+
+### FINAL VERDICT: 
+- **Rating**: [Factually Accurate | Partially Accurate | Factually Inaccurate]
+- **Explanation**: [1-2 sentence justification for the rating]
+
+### KEY SOURCES CONSULTED:
+- List 2-3 main authoritative sources used
+
+IMPORTANT: 
+1. Begin your analysis immediately with the first claim
+2. Every claim MUST include a timestamp 
+3. The segment is very short, so be concise and focus only on 1-2 main claims
+4. If there are no factual claims in this segment, clearly state "No factual claims were identified in this segment" and provide a brief description of what was discussed instead`;
+
+  // Define current fact status variable for the segment check
+  let currentFactStatus = "partial"; // Default status
+
+  // Define the callback to update the UI with each incoming chunk
+  const onPartialUpdate = (accumulatedText, isFinal = false) => {
+    // Check if we're still in active fact-checking mode
+    if (!factCheckingInProgress) {
+      return; // Skip updates if fact-checking was cancelled or timed out
+    }
+
+    // Remove loading class once we start getting content
+    factCheckResultDiv.classList.remove("loading");
+
+    // For the final update, we definitely want to use the OVERALL ASSESSMENT
+    // Otherwise, use our progressive determination logic
+    if (isFinal) {
+      currentFactStatus = determineFactStatus(accumulatedText);
+    } else {
+      currentFactStatus = determineFactStatus(accumulatedText);
+    }
+
+    // Create status indicator based on determined status
+    let statusHtml = "";
+    if (currentFactStatus === "true") {
+      statusHtml = '<div class="fact-status true">Factually Accurate</div>';
+    } else if (currentFactStatus === "false") {
+      statusHtml = '<div class="fact-status false">Factually Inaccurate</div>';
+    } else {
+      statusHtml = '<div class="fact-status partial">Partially Accurate</div>';
+    }
+
+    // If this is the final update, reprocess the entire markdown for clean rendering
+    if (isFinal) {
+      console.log(
+        "[DEBUG] Final segment response received, refreshing markdown"
+      );
+      factCheckResultDiv.innerHTML = statusHtml + marked.parse(accumulatedText);
+    } else {
+      // For streaming updates, render as we go
+      factCheckResultDiv.innerHTML = statusHtml + marked.parse(accumulatedText);
+    }
+  };
+
+  try {
+    const finalText = await callGoogleGenAIStream(
+      userApiKey,
+      transcript,
+      userPrompt,
+      onPartialUpdate
+    );
+    console.log("[DEBUG] LLM call complete. Sidebar updated.");
+
+    // Reset the fact checking status
+    factCheckingInProgress = false;
+    if (factCheckTimeoutId !== null) {
+      clearTimeout(factCheckTimeoutId);
+      factCheckTimeoutId = null;
+    }
+
+    if (finalText && finalText.length >= 100) {
+      console.log("[DEBUG] Response length sufficient, caching result");
+      // Modify the cache key to include segment information
+      const segmentCacheKey = `${videoId}_segment_${timeWindow.formattedStart}_${timeWindow.formattedEnd}`;
+      cacheFactCheckResult(segmentCacheKey, finalText, currentFactStatus);
+    } else {
+      console.warn(
+        "[DEBUG] Response too short (length: " +
+          (finalText ? finalText.length : 0) +
+          "), not caching"
+      );
+    }
+
+    // Add source citation section if not already present
+    if (!document.querySelector(".source-citation")) {
+      const sourceSection = document.createElement("div");
+      sourceSection.className = "source-citation";
+      sourceSection.innerHTML =
+        "Analysis based on video segment transcript from " +
+        timeWindow.formattedStart +
+        " to " +
+        timeWindow.formattedEnd;
+      factCheckResultDiv.appendChild(sourceSection);
+    }
+
+    // Add disclaimer
+    addDisclaimerToSidebar();
+  } catch (error) {
+    // Reset the fact checking status
+    factCheckingInProgress = false;
+    if (factCheckTimeoutId !== null) {
+      clearTimeout(factCheckTimeoutId);
+      factCheckTimeoutId = null;
+    }
+
+    factCheckResultDiv.innerHTML = `
+      <div class="fact-status false">Error</div>
+      <p>Error: ${error.message}</p>
+      <p>Please try again or check your API key configuration.</p>
+    `;
+    console.error("[DEBUG] Error calling LLM:", error);
   }
 }
 
@@ -1298,6 +1697,8 @@ function injectFactCheckButton() {
   // If the button already exists, don't add another.
   if (document.querySelector(".my-custom-button")) {
     console.log("[DEBUG] Button already exists, not adding another one.");
+    // Try to add the second button if the first one exists
+    injectSecondButton();
     return true;
   }
 
@@ -1319,12 +1720,13 @@ function injectFactCheckButton() {
 
   console.log("[DEBUG] Control bar found. Inserting custom button...");
   try {
-    // Create a container (flex) to host our custom button
+    // Create a container (flex) to host our custom buttons
     const container = document.createElement("div");
     container.style.display = "flex";
     container.style.flexGrow = "1"; // fill horizontal space
     container.style.justifyContent = "flex-end";
     container.style.alignItems = "center";
+    container.className = "custom-buttons-container"; // Add class for easier selection
 
     // Create the custom button
     const button = document.createElement("button");
@@ -1397,13 +1799,150 @@ function injectFactCheckButton() {
     controlBar.appendChild(container);
 
     console.log("[DEBUG] Custom button and sidebar inserted!");
+
+    // Now inject the second button
+    setTimeout(() => {
+      injectSecondButton();
+    }, 500);
+
     return true;
   } catch (err) {
     console.error("[DEBUG] injectFactCheckButton error:", err);
     return false;
   }
 }
+function injectSecondButton() {
+  console.log("[DEBUG] Injecting segment fact check button...");
 
+  // If the second button already exists, don't add another.
+  if (document.querySelector(".my-segment-button")) {
+    console.log(
+      "[DEBUG] Segment button already exists, not adding another one."
+    );
+    return true;
+  }
+
+  // Look for our first button's container
+  const firstButtonContainer = document
+    .querySelector(".my-custom-button")
+    .closest("div");
+  if (!firstButtonContainer) {
+    console.log("[DEBUG] First button container not found yet");
+    return false;
+  }
+
+  console.log("[DEBUG] First button found. Inserting segment button...");
+  try {
+    // Create the second button
+    const button = document.createElement("button");
+    button.className = "ytp-button my-segment-button";
+    button.title = "Fact Check Last 2 Minutes";
+    button.style.width = "30px";
+    button.style.height = "30px";
+    button.style.marginLeft = "8px"; // Add some spacing between buttons
+
+    // Create an icon (using the same icon as the first button)
+    const icon = document.createElement("img");
+    icon.src = cachedIconUrl2;
+    icon.style.width = "100%";
+    icon.style.height = "100%";
+    icon.style.filter = "none"; // override YouTube invert if needed
+    button.appendChild(icon);
+
+    // Add a click event listener for the segment check button
+    button.addEventListener("click", async () => {
+      console.log("[DEBUG] Segment fact check button clicked.");
+
+      // If sidebar is visible, just hide it
+      if (sidebarVisible) {
+        toggleSidebar(false); // Hides sidebar
+
+        // Cancel any ongoing fact check
+        if (factCheckingInProgress) {
+          factCheckingInProgress = false;
+          if (factCheckTimeoutId !== null) {
+            clearTimeout(factCheckTimeoutId);
+            factCheckTimeoutId = null;
+          }
+        }
+        return;
+      }
+
+      // Get the current time window
+      const timeWindow = getCurrentVideoTimeWindow();
+      if (!timeWindow) {
+        console.warn("[DEBUG] Could not determine current video time");
+        return;
+      }
+
+      // Get the current video ID
+      const videoId = getYouTubeVideoId();
+      if (!videoId) {
+        console.warn("[DEBUG] Could not determine video ID");
+        return;
+      }
+
+      // Show the sidebar with loading message
+      toggleSidebar(true);
+      initializeSidebarContent(
+        `Loading fact check for segment ${timeWindow.formattedStart} - ${timeWindow.formattedEnd}...`
+      );
+
+      // Clear any existing timeout
+      if (factCheckTimeoutId !== null) {
+        clearTimeout(factCheckTimeoutId);
+        factCheckTimeoutId = null;
+      }
+
+      // Set the fact checking status
+      factCheckingInProgress = true;
+
+      // Start a new timeout for this fact check attempt
+      factCheckTimeoutId = setTimeout(() => {
+        if (factCheckingInProgress) {
+          console.log("[DEBUG] Segment fact check timeout reached.");
+          factCheckingInProgress = false;
+          factCheckTimeoutId = null;
+
+          // Update sidebar with timeout message
+          const factCheckResultDiv =
+            document.getElementById("fact-check-result");
+          if (factCheckResultDiv) {
+            factCheckResultDiv.classList.remove("loading");
+            factCheckResultDiv.innerHTML = `
+              <div class="fact-status false">Timeout</div>
+              <p>The segment fact check took too long to complete. Please try again.</p>
+            `;
+          }
+        }
+      }, FACT_CHECK_TIMEOUT);
+
+      // Retrieve the saved API key and start fact-checking
+      chrome.storage.sync.get("apiKey", async (data) => {
+        if (!isActive) return; // Abort if the context is invalid
+        const userApiKey = data.apiKey;
+
+        if (!userApiKey) {
+          initializeSidebarContent(
+            '<span style="color:red;">No API key found. Please set it in the extension’s options.</span>'
+          );
+          return;
+        }
+
+        await processSegmentFactCheck(timeWindow, userApiKey, videoId);
+      });
+    });
+
+    // Add the button to the container
+    firstButtonContainer.appendChild(button);
+
+    console.log("[DEBUG] Segment fact check button inserted!");
+    return true;
+  } catch (err) {
+    console.error("[DEBUG] injectSecondButton error:", err);
+    return false;
+  }
+}
 // ===== INITIALIZATION =====
 
 function setupNavigationDetection() {
