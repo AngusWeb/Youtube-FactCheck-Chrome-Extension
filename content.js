@@ -16,7 +16,7 @@ let buttonInjectionAttempts = 0;
 const MAX_INJECTION_ATTEMPTS = 3;
 let factCheckingInProgress = false;
 let factCheckTimeoutId = null;
-const FACT_CHECK_TIMEOUT = 15000; // 30 seconds timeout
+const FACT_CHECK_TIMEOUT = 22000; // 30 seconds timeout
 
 // ===== UTILITY FUNCTIONS =====
 
@@ -626,12 +626,12 @@ async function getTranscriptWithRetry(videoId, userApiKey) {
 
   if (!transcript || transcript.length === 0) {
     console.log(
-      "[DEBUG] No transcript found on first attempt. Will retry after 5 seconds..."
+      "[DEBUG] No transcript found on first attempt. Will retry after 4 seconds..."
     );
 
     // Show a waiting message in the sidebar
     initializeSidebarContent(
-      "Waiting for YouTube to load transcript (retrying in 5 seconds)..."
+      "Waiting for YouTube to load transcript (retrying in 4 seconds)..."
     );
 
     // Wait 5 seconds and try again
@@ -675,7 +675,7 @@ async function getTranscriptWithRetry(videoId, userApiKey) {
         } else {
           resolve(retryTranscript);
         }
-      }, 5000); // 5 second delay for retry
+      }, 4000); // 5 second delay for retry
     });
   }
 
@@ -944,7 +944,7 @@ async function callGoogleGenAIStream(
 function determineFactStatus(text) {
   // First, check if we have a final verdict with the OVERALL ASSESSMENT
   const overallAssessmentMatch = text.match(
-    /\*\*OVERALL ASSESSMENT:\*\*.*?(?:"|'|)([^".]*?)(?:"|'|\.|$)/i
+    /\*\*FINAL VERDICT\*\*.*?(?:"|'|)([^".]*?)(?:"|'|\.|$)/i
   );
 
   if (overallAssessmentMatch) {
@@ -1067,35 +1067,53 @@ async function processFactCheck(transcript, userApiKey, videoId) {
   `;
 
   const factCheckResultDiv = document.getElementById("fact-check-result");
-  const userPrompt = `IDENTIFY KEY CLAIMS:
-- Analyze the transcript to identify significant provable factual claims
-- Focus on claims that are central to the video's main argument
-- Prioritize claims that can be definitively verified or refuted with evidence
-- Avoid analyzing purely subjective opinions or highly speculative statements
+  const userPrompt = `# FACT-CHECKING YOUTUBE VIDEOS
 
-FORMAT BY CLAIM:
-For each major claim identified, create a concise section:
-CLAIM #[number]: "[Direct quote with timestamp]"
-  VERDICT:
-  - Assess accuracy based on verifiable evidence and expert consensus
-  - Rate as: Correct, Partially Correct, Incorrect, or Misleading
-  - Briefly explain reasoning with 1-2 specific supporting facts
-  
-  CONTEXT (brief):
-  - Include only essential missing context needed for accuracy
-  - If relevant, note any significant alternative perspective in 1-2 sentences
-  - For incorrect claims, provide the accurate information concisely
-  
-OVERALL ASSESSMENT:
+Analyze the transcript and proceed directly to examining the key factual claims without any explanatory introduction.
+
+## FORMAT EACH CLAIM AS FOLLOWS:
+
+### CLAIM #[number]: "[Direct quote]" [TIMESTAMP REQUIRED - HH:MM:SS or MM:SS format]
+
+#### VERDICT:
+- **Rating**: [Correct | Partially Correct | Incorrect | Misleading]
+- **Explanation**: Provide a clear 2-3 sentence explanation of why this claim is true, false, or partially accurate, focusing on factual evidence.
+
+#### EVIDENCE:
+- Cite 2-3 relevant authoritative sources that verify or refute the claim
+- Format each source as: "[Source name] ([Publication date]): [Brief description of relevant finding]"
+- Prioritize academic research, official statistics, and recognized expert organizations
+- Include accessible URLs where available
+
+#### CONTEXT:
+- Include essential missing context needed for full understanding
+- If relevant, note any significant alternative perspective in 1-2 sentences
+- For incorrect claims, provide the accurate information concisely
+
+## OVERALL ASSESSMENT:
+
+### SUMMARY:
 - Provide a brief summary of the video's factual reliability (2-3 sentences)
 - Note the proportion of accurate vs. inaccurate claims
-- Issue a final verdict as: "Factually Accurate," "Partially Accurate," or "Factually Inaccurate"
 
-RESPONSE LENGTH GUIDELINES:
+### FINAL VERDICT: 
+- **Rating**: [Factually Accurate | Partially Accurate | Factually Inaccurate]
+- **Explanation**: [1-2 sentence justification for the rating]
+
+### KEY SOURCES CONSULTED:
+- List 3-5 main authoritative sources used across all claims
+- Format as bullet points with full citations
+
+## RESPONSE LENGTH GUIDELINES:
 - Videos under 3 minutes: Analyze 1-2 main claims, response under 300 words
 - Videos 3-10 minutes: Analyze 2-3 main claims, response under 500 words
 - Videos over 10 minutes: Analyze maximum of 4 main claims, under 800 words
-- Keep all explanations brief and evidence-focused`;
+- Keep all explanations brief and evidence-focused
+
+IMPORTANT: 
+1. Begin your analysis immediately with the first claim
+2. Every claim MUST include a timestamp in the format HH:MM:SS or MM:SS
+3. Do not include any explanatory preamble or restate these instructions`;
   console.log(
     "[DEBUG] Sending transcript + prompt to callGoogleGenAIStream..."
   );
