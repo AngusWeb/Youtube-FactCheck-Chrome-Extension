@@ -7,24 +7,24 @@ try {
   cachedIconUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAU..."; // fallback
 }
 
-let cachedIconUrl2;
-try {
-  cachedIconUrl2 = chrome.runtime.getURL("icons/my-icon-white-2.png");
-} catch (error) {
-  console.error("[DEBUG] Could not get icon URL:", error);
-  cachedIconUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAU..."; // fallback
-}
-
 // Global state
 let isActive = true;
 const factCheckCache = {};
 let sidebar;
 let sidebarVisible = false;
-let buttonInjectionAttempts = 0;
-const MAX_INJECTION_ATTEMPTS = 3;
+
 let factCheckingInProgress = false;
 let factCheckTimeoutId = null;
 const FACT_CHECK_TIMEOUT = 22000; // 30 seconds timeout
+// Configuration object for button injection
+const buttonConfig = {
+  injectionAttempts: 0,
+  maxAttempts: 3,
+  checkInterval: 500, // ms
+  injectionDelay: 1000, // ms after navigation
+  buttonInjected: false,
+  injectionInProgress: false,
+};
 
 // ===== UTILITY FUNCTIONS =====
 
@@ -77,7 +77,9 @@ function isVideoPage() {
 
 function resetUI() {
   console.log("[DEBUG] Resetting UI state...");
-  buttonInjectionAttempts = 0;
+
+  // Reset button injection state
+  resetButtonInjectionState();
 
   // Cancel any ongoing fact check
   if (factCheckingInProgress) {
@@ -94,28 +96,17 @@ function resetUI() {
   }
 
   // Remove any existing buttons to prevent duplicates
-  const existingFirstButton = document.querySelector(".my-custom-button");
-  const existingSecondButton = document.querySelector(".my-second-button");
-
-  if (existingFirstButton && existingFirstButton.parentElement) {
-    // If the parent element contains both buttons, remove the entire container
-    if (
-      existingFirstButton.parentElement.classList.contains(
-        "custom-buttons-container"
-      )
-    ) {
-      existingFirstButton.parentElement.remove();
-      console.log("[DEBUG] Removed existing button container");
-    } else {
-      existingFirstButton.remove();
-      console.log("[DEBUG] Removed existing first button");
+  const existingContainer = document.querySelector(".custom-buttons-container");
+  if (existingContainer) {
+    existingContainer.remove();
+    console.log("[DEBUG] Removed existing button container");
+  } else {
+    // If no container, check for standalone button
+    const existingButton = document.querySelector(".my-custom-button");
+    if (existingButton) {
+      existingButton.remove();
+      console.log("[DEBUG] Removed existing button");
     }
-  }
-
-  if (existingSecondButton && !existingFirstButton) {
-    // In case the second button exists but not within a container with the first button
-    existingSecondButton.remove();
-    console.log("[DEBUG] Removed existing second button");
   }
 
   // Ensure body class is removed
@@ -717,6 +708,20 @@ function getCurrentVideoTimeWindow() {
   // Get current time in seconds
   const currentTime = video.currentTime;
 
+  // If current time is less than 2 minutes, use 0 to currentTime as the window
+  // This handles the case where users check early in the video
+  if (currentTime < 120) {
+    console.log(
+      "[DEBUG] Video position is less than 2 minutes. Using 0 to current time."
+    );
+    return {
+      startTime: 0,
+      endTime: 120,
+      formattedStart: formatTimeStamp(0),
+      formattedEnd: formatTimeStamp(120),
+    };
+  }
+
   // Calculate start time (2 minutes before current position)
   const startTime = Math.max(0, currentTime - 120); // Don't go below 0
 
@@ -835,115 +840,6 @@ function convertYouTubeTimestampToSeconds(timestamp) {
     );
     return 0;
   }
-}
-function getYouTubeTranscriptSegmentByTime(startTimeSeconds, endTimeSeconds) {
-  // Try the timestamp-based method first
-  const segmentByTimestamp = getYouTubeTranscriptSegment(
-    startTimeSeconds,
-    endTimeSeconds
-  );
-
-  if (segmentByTimestamp && segmentByTimestamp.length > 0) {
-    return segmentByTimestamp;
-  }
-
-  console.log(
-    "[DEBUG] Timestamp-based extraction failed. Trying alternate method..."
-  );
-
-  // Fallback: Get the full transcript and filter by estimated time windows
-  const transcriptContainer = document.querySelector(
-    "ytd-transcript-segment-list-renderer"
-  );
-  if (!transcriptContainer) {
-    console.warn("[DEBUG] Transcript container NOT found in DOM.");
-    return "";
-  }
-
-  // Get all segments
-  const segments = Array.from(
-    transcriptContainer.querySelectorAll("ytd-transcript-segment-renderer")
-  );
-
-  // If we can't find segments using the normal method, try a more general approach
-  if (!segments || segments.length === 0) {
-    console.warn(
-      "[DEBUG] No transcript segments found with standard selector."
-    );
-    return getFullTranscriptAndApproximateSegment(
-      startTimeSeconds,
-      endTimeSeconds
-    );
-  }
-
-  console.log("[DEBUG] Found", segments.length, "total transcript segments");
-
-  // Find an approximate mapping of timestamps to positions in the transcript
-  // First, collect all timestamps we can find
-  const timestampMap = [];
-
-  segments.forEach((segment, index) => {
-    try {
-      const timestampEl = segment.querySelector(".segment-timestamp");
-      if (timestampEl) {
-        const timestampText = timestampEl.textContent.trim();
-        const timeInSeconds = convertYouTubeTimestampToSeconds(timestampText);
-        timestampMap.push({
-          index: index,
-          time: timeInSeconds,
-          text:
-            segment
-              .querySelector("yt-formatted-string.segment-text")
-              ?.textContent.trim() || "",
-        });
-      }
-    } catch (error) {
-      // Skip problematic segments
-    }
-  });
-
-  // Sort by time
-  timestampMap.sort((a, b) => a.time - b.time);
-
-  // Find start and end indices that cover our time window
-  let startIndex = -1;
-  let endIndex = -1;
-
-  for (let i = 0; i < timestampMap.length; i++) {
-    if (timestampMap[i].time >= startTimeSeconds && startIndex === -1) {
-      startIndex = i;
-    }
-    if (timestampMap[i].time > endTimeSeconds && endIndex === -1) {
-      endIndex = i;
-      break;
-    }
-  }
-
-  // If we couldn't find the end, use the last available segment
-  if (endIndex === -1) {
-    endIndex = timestampMap.length - 1;
-  }
-
-  // If we couldn't find the start, use the first segment
-  if (startIndex === -1) {
-    startIndex = 0;
-  }
-
-  // Extract the segment text
-  let segmentText = "";
-  for (let i = startIndex; i <= endIndex; i++) {
-    segmentText += `[${formatTimeStamp(timestampMap[i].time)}] ${
-      timestampMap[i].text
-    } `;
-  }
-
-  console.log(
-    `[DEBUG] Extracted ${
-      endIndex - startIndex + 1
-    } segments using fallback method`
-  );
-
-  return segmentText.trim();
 }
 
 // ===== CACHE MANAGEMENT =====
@@ -1505,7 +1401,7 @@ async function processSegmentFactCheck(timeWindow, userApiKey, videoId) {
   await new Promise((resolve) => setTimeout(resolve, 1500));
 
   // Try to get the transcript segment using our improved function
-  const transcript = getYouTubeTranscriptSegmentByTime(
+  const transcript = getYouTubeTranscriptSegment(
     timeWindow.startTime,
     timeWindow.endTime
   );
@@ -1522,7 +1418,7 @@ async function processSegmentFactCheck(timeWindow, userApiKey, videoId) {
   }
 
   // If the transcript is too short, it might be a parsing issue - try to get the full transcript as backup
-  if (transcript.length < 50) {
+  if (transcript.length < 25) {
     console.warn(
       "[DEBUG] Transcript segment is suspiciously short. Getting full transcript as backup."
     );
@@ -1688,17 +1584,95 @@ IMPORTANT:
     console.error("[DEBUG] Error calling LLM:", error);
   }
 }
+async function handleFactCheck(videoId, userApiKey) {
+  // Clear any existing timeout
+  if (factCheckTimeoutId !== null) {
+    clearTimeout(factCheckTimeoutId);
+    factCheckTimeoutId = null;
+  }
 
+  // Set the fact checking status
+  factCheckingInProgress = true;
+
+  // Start a new timeout for this fact check attempt
+  factCheckTimeoutId = setTimeout(() => {
+    // Only proceed if we're still loading
+    if (factCheckingInProgress) {
+      console.log("[DEBUG] Fact check timeout reached. Restarting process...");
+      factCheckingInProgress = false;
+      factCheckTimeoutId = null;
+
+      // Update the sidebar to show we're restarting
+      const factCheckResultDiv = document.getElementById("fact-check-result");
+      if (factCheckResultDiv) {
+        factCheckResultDiv.classList.add("loading");
+        factCheckResultDiv.innerHTML = `
+          <div class="fact-status partial">Restarting Analysis...</div>
+          <p>The previous attempt took too long. Restarting fact check process...</p>
+        `;
+      }
+
+      // Retry the fact check
+      setTimeout(() => {
+        handleFactCheck(videoId, userApiKey);
+      }, 1000); // Wait a second before restarting
+    }
+  }, FACT_CHECK_TIMEOUT);
+
+  // Check if we have a cached result
+  const cachedResult = await getCachedFactCheck(videoId);
+
+  if (cachedResult) {
+    console.log("[DEBUG] Using cached fact check result");
+    factCheckingInProgress = false;
+    clearTimeout(factCheckTimeoutId); // Clear the timeout since we have a result
+    factCheckTimeoutId = null;
+    displayCachedFactCheck(cachedResult);
+    return;
+  }
+
+  // Get transcript with retry logic
+  const transcript = await getTranscriptWithRetry(videoId, userApiKey);
+
+  if (transcript && transcript.length > 0) {
+    await processFactCheck(transcript, userApiKey, videoId);
+    factCheckingInProgress = false;
+    clearTimeout(factCheckTimeoutId); // Clear the timeout since we have completed
+    factCheckTimeoutId = null;
+  } else {
+    factCheckingInProgress = false;
+    clearTimeout(factCheckTimeoutId); // Clear the timeout since we've hit an error condition
+    factCheckTimeoutId = null;
+
+    // Update sidebar with error message about transcript unavailability
+    const factCheckResultDiv = document.getElementById("fact-check-result");
+    if (factCheckResultDiv) {
+      factCheckResultDiv.classList.remove("loading");
+      factCheckResultDiv.innerHTML = `
+        <div class="fact-status false">Error</div>
+        <p>We couldn't obtain the transcript for this video. Please try one of the following:</p>
+        <ul>
+          <li>Check if this video has captions/transcript available</li>
+          <li>Try opening the transcript manually and then clicking the fact check button again</li>
+          <li>Refresh the page and try again</li>
+        </ul>
+      `;
+    }
+  }
+}
 // ===== BUTTON INJECTION =====
 
+/**
+ * Single point of entry for button injection
+ * @param {boolean} force - Whether to force injection even if already injected
+ * @returns {boolean} - Whether injection was successful
+ */
 function injectFactCheckButton() {
   console.log("[DEBUG] Injecting fact check button...");
 
   // If the button already exists, don't add another.
   if (document.querySelector(".my-custom-button")) {
     console.log("[DEBUG] Button already exists, not adding another one.");
-    // Try to add the second button if the first one exists
-    injectSecondButton();
     return true;
   }
 
@@ -1720,13 +1694,17 @@ function injectFactCheckButton() {
 
   console.log("[DEBUG] Control bar found. Inserting custom button...");
   try {
-    // Create a container (flex) to host our custom buttons
+    // Create a container (flex) to host our custom button and dropdown
     const container = document.createElement("div");
     container.style.display = "flex";
+
     container.style.flexGrow = "1"; // fill horizontal space
+
     container.style.justifyContent = "flex-end";
     container.style.alignItems = "center";
     container.className = "custom-buttons-container"; // Add class for easier selection
+    container.style.position = "relative"; // For dropdown positioning
+    container.style.marginRight = "8px"; // Add some spacing
 
     // Create the custom button
     const button = document.createElement("button");
@@ -1743,12 +1721,108 @@ function injectFactCheckButton() {
     icon.style.filter = "none"; // override YouTube invert if needed
     button.appendChild(icon);
 
-    // Add a click event that toggles the sidebar + calls the AI
-    button.addEventListener("click", async () => {
-      console.log("[DEBUG] Custom button clicked. Toggling sidebar.");
+    // Create the dropdown menu (initially hidden) with YouTube styling
+    const dropdown = document.createElement("div");
+    dropdown.className = "fact-check-dropdown ytp-popup ytp-settings-menu";
+    dropdown.style.position = "absolute";
+    dropdown.style.bottom = "60px"; // Position above the player controls
+    dropdown.style.left = "0"; // Position above the button
+    dropdown.style.background = "rgba(28, 28, 28, 0.9)";
+    dropdown.style.borderRadius = "12px";
+    dropdown.style.boxShadow = "0 2px 10px rgba(0, 0, 0, 0.5)";
+    dropdown.style.zIndex = "6000 !important";
+    dropdown.style.display = "none";
+    dropdown.style.width = "200px";
+    dropdown.style.overflow = "hidden";
+    dropdown.style.transition = "opacity 0.1s cubic-bezier(0,0,0.2,1)";
+    dropdown.style.textShadow = "0 0 2px rgba(0, 0, 0, 0.5)";
+
+    // Create dropdown menu title
+    const menuTitle = document.createElement("div");
+    menuTitle.className = "ytp-panel-title";
+    menuTitle.textContent = "Fact Check Options";
+    menuTitle.style.padding = "14px 20px";
+    menuTitle.style.fontSize = "13px";
+    menuTitle.style.fontWeight = "500";
+    menuTitle.style.color = "#fff";
+    menuTitle.style.textAlign = "center";
+    menuTitle.style.borderBottom = "1px solid rgba(255, 255, 255, 0.2)";
+
+    // Create dropdown options styled like YouTube menu options
+    const fullCheckOption = document.createElement("div");
+    fullCheckOption.className = "dropdown-option ytp-menuitem";
+    fullCheckOption.style.padding = "12px 15px";
+    fullCheckOption.style.cursor = "pointer";
+    fullCheckOption.style.color = "#eee";
+    fullCheckOption.style.fontSize = "13px";
+    fullCheckOption.style.fontFamily =
+      "YouTube Noto, Roboto, Arial, sans-serif";
+    fullCheckOption.style.display = "flex";
+    fullCheckOption.style.alignItems = "center";
+    fullCheckOption.style.height = "40px";
+    fullCheckOption.style.borderBottom = "1px solid rgba(255, 255, 255, 0.1)";
+
+    // Add icon to the option
+    const fullCheckIcon = document.createElement("span");
+    fullCheckIcon.innerHTML = `<svg fill="#fff" height="24" width="24" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 490.4 490.4" xml:space="preserve"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <g> <path d="M484.1,454.796l-110.5-110.6c29.8-36.3,47.6-82.8,47.6-133.4c0-116.3-94.3-210.6-210.6-210.6S0,94.496,0,210.796 s94.3,210.6,210.6,210.6c50.8,0,97.4-18,133.8-48l110.5,110.5c12.9,11.8,25,4.2,29.2,0C492.5,475.596,492.5,463.096,484.1,454.796z M41.1,210.796c0-93.6,75.9-169.5,169.5-169.5s169.6,75.9,169.6,169.5s-75.9,169.5-169.5,169.5S41.1,304.396,41.1,210.796z"></path> </g> </g></svg>`;
+    fullCheckIcon.style.marginRight = "12px";
+
+    const fullCheckText = document.createElement("span");
+    fullCheckText.textContent = "Full Video Fact Check";
+
+    fullCheckOption.appendChild(fullCheckIcon);
+    fullCheckOption.appendChild(fullCheckText);
+
+    const segmentCheckOption = document.createElement("div");
+    segmentCheckOption.className = "dropdown-option ytp-menuitem";
+    segmentCheckOption.style.padding = "12px 15px";
+    segmentCheckOption.style.cursor = "pointer";
+    segmentCheckOption.style.color = "#eee";
+    segmentCheckOption.style.fontSize = "13px";
+    segmentCheckOption.style.fontFamily =
+      "YouTube Noto, Roboto, Arial, sans-serif";
+    segmentCheckOption.style.display = "flex";
+    segmentCheckOption.style.alignItems = "center";
+    segmentCheckOption.style.height = "40px";
+
+    // Add icon to the option
+    const segmentCheckIcon = document.createElement("span");
+
+    segmentCheckIcon.innerHTML = `<svg fill="#fff" height="24" width="24" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 455 455" xml:space="preserve"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <path d="M332.229,90.04l14.238-27.159l-26.57-13.93L305.67,76.087c-19.618-8.465-40.875-13.849-63.17-15.523V30h48.269V0H164.231v30 H212.5v30.563c-22.295,1.674-43.553,7.059-63.171,15.523L135.103,48.95l-26.57,13.93l14.239,27.16 C67.055,124.958,30,186.897,30,257.5C30,366.576,118.424,455,227.5,455S425,366.576,425,257.5 C425,186.896,387.944,124.958,332.229,90.04z M355,272.5H212.5V130h30v112.5H355V272.5z"></path> </g></svg>`;
+    segmentCheckIcon.style.marginRight = "12px";
+
+    const segmentCheckText = document.createElement("span");
+    segmentCheckText.textContent = "Fact Check Last 2 Minutes";
+
+    segmentCheckOption.appendChild(segmentCheckIcon);
+    segmentCheckOption.appendChild(segmentCheckText);
+
+    // Add hover effect to options
+    const applyHoverStyle = (element) => {
+      element.addEventListener("mouseover", () => {
+        element.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+      });
+      element.addEventListener("mouseout", () => {
+        element.style.backgroundColor = "";
+      });
+    };
+
+    applyHoverStyle(fullCheckOption);
+    applyHoverStyle(segmentCheckOption);
+
+    // Add title and options to dropdown
+    dropdown.appendChild(menuTitle);
+    dropdown.appendChild(fullCheckOption);
+    dropdown.appendChild(segmentCheckOption);
+
+    // Toggle dropdown on button click
+    button.addEventListener("click", (e) => {
+      e.stopPropagation(); // Prevent event bubbling
+      console.log("[DEBUG] Fact check button clicked");
 
       // If sidebar is visible, just hide it
       if (sidebarVisible) {
+        console.log("[DEBUG] Sidebar is visible, hiding it");
         toggleSidebar(false); // Hides sidebar
 
         // Cancel any ongoing fact check
@@ -1762,7 +1836,85 @@ function injectFactCheckButton() {
         return;
       }
 
-      // If sidebar was hidden and we're showing it
+      // Toggle dropdown visibility
+      console.log("[DEBUG] Toggling dropdown");
+      const isVisible = dropdown.style.display !== "none";
+      if (isVisible) {
+        dropdown.style.display = "none";
+        console.log("[DEBUG] Hiding dropdown");
+      } else {
+        // First, make sure the dropdown is visible before positioning it
+        dropdown.style.display = "block";
+        dropdown.style.opacity = "1";
+
+        // Position the dropdown relative to the button
+        positionDropdown(button, dropdown);
+        console.log(
+          "[DEBUG] Showing dropdown, display:",
+          dropdown.style.display
+        );
+
+        // Add a check to verify dropdown visibility after a short delay
+        setTimeout(() => {
+          console.log(
+            "[DEBUG] Dropdown display after delay:",
+            dropdown.style.display
+          );
+          console.log(
+            "[DEBUG] Dropdown opacity after delay:",
+            dropdown.style.opacity
+          );
+          console.log(
+            "[DEBUG] Dropdown position:",
+            dropdown.style.left,
+            dropdown.style.bottom
+          );
+          console.log("[DEBUG] Dropdown z-index:", dropdown.style.zIndex);
+        }, 100);
+      }
+    });
+
+    // Function to position the dropdown properly
+    function positionDropdown(buttonEl, dropdownEl) {
+      console.log("[DEBUG] Positioning dropdown");
+      const buttonRect = buttonEl.getBoundingClientRect();
+
+      // Calculate the center position of the button
+      const buttonCenter = buttonRect.left + buttonRect.width / 2;
+
+      // Get the dropdown width to center it
+      const dropdownWidth = dropdownEl.offsetWidth || 200; // Use 200px as fallback if not yet rendered
+      const dropdownHeight = dropdownEl.offsetHeight || 120; // Estimate height if not yet rendered
+
+      // Position dropdown centered above the button with margin based on dropdown height
+      dropdownEl.style.bottom = `${dropdownHeight * 1.1}px`;
+
+      // Center the dropdown horizontally relative to the button
+      dropdownEl.style.left = `${buttonCenter - dropdownWidth / 2}px`;
+      dropdownEl.style.right = "auto";
+
+      // Apply explicit z-index in JavaScript
+      dropdownEl.style.zIndex = "6000"; // Without !important since we can't use it in JS
+
+      // Alternative z-index application using setAttribute
+      dropdownEl.setAttribute(
+        "style",
+        dropdownEl.getAttribute("style") + "; z-index: 6000 !important;"
+      );
+
+      console.log(
+        "[DEBUG] Dropdown positioned at left:",
+        dropdownEl.style.left,
+        "bottom:",
+        dropdownEl.style.bottom
+      );
+    }
+
+    // Add event listeners for dropdown options
+    fullCheckOption.addEventListener("click", async () => {
+      dropdown.style.display = "none"; // Hide dropdown after selection
+
+      // Toggle sidebar and show loading state
       toggleSidebar(true); // Shows sidebar
       initializeSidebarContent("Loading...");
 
@@ -1794,79 +1946,8 @@ function injectFactCheckButton() {
       });
     });
 
-    // Add the container + button to the control bar
-    container.appendChild(button);
-    controlBar.appendChild(container);
-
-    console.log("[DEBUG] Custom button and sidebar inserted!");
-
-    // Now inject the second button
-    setTimeout(() => {
-      injectSecondButton();
-    }, 500);
-
-    return true;
-  } catch (err) {
-    console.error("[DEBUG] injectFactCheckButton error:", err);
-    return false;
-  }
-}
-function injectSecondButton() {
-  console.log("[DEBUG] Injecting segment fact check button...");
-
-  // If the second button already exists, don't add another.
-  if (document.querySelector(".my-segment-button")) {
-    console.log(
-      "[DEBUG] Segment button already exists, not adding another one."
-    );
-    return true;
-  }
-
-  // Look for our first button's container
-  const firstButtonContainer = document
-    .querySelector(".my-custom-button")
-    .closest("div");
-  if (!firstButtonContainer) {
-    console.log("[DEBUG] First button container not found yet");
-    return false;
-  }
-
-  console.log("[DEBUG] First button found. Inserting segment button...");
-  try {
-    // Create the second button
-    const button = document.createElement("button");
-    button.className = "ytp-button my-segment-button";
-    button.title = "Fact Check Last 2 Minutes";
-    button.style.width = "30px";
-    button.style.height = "30px";
-    button.style.marginLeft = "8px"; // Add some spacing between buttons
-
-    // Create an icon (using the same icon as the first button)
-    const icon = document.createElement("img");
-    icon.src = cachedIconUrl2;
-    icon.style.width = "100%";
-    icon.style.height = "100%";
-    icon.style.filter = "none"; // override YouTube invert if needed
-    button.appendChild(icon);
-
-    // Add a click event listener for the segment check button
-    button.addEventListener("click", async () => {
-      console.log("[DEBUG] Segment fact check button clicked.");
-
-      // If sidebar is visible, just hide it
-      if (sidebarVisible) {
-        toggleSidebar(false); // Hides sidebar
-
-        // Cancel any ongoing fact check
-        if (factCheckingInProgress) {
-          factCheckingInProgress = false;
-          if (factCheckTimeoutId !== null) {
-            clearTimeout(factCheckTimeoutId);
-            factCheckTimeoutId = null;
-          }
-        }
-        return;
-      }
+    segmentCheckOption.addEventListener("click", async () => {
+      dropdown.style.display = "none"; // Hide dropdown after selection
 
       // Get the current time window
       const timeWindow = getCurrentVideoTimeWindow();
@@ -1933,40 +2014,103 @@ function injectSecondButton() {
       });
     });
 
-    // Add the button to the container
-    firstButtonContainer.appendChild(button);
+    // Close dropdown when clicking outside
+    document.addEventListener("click", (e) => {
+      if (!container.contains(e.target) && dropdown.style.display !== "none") {
+        console.log("[DEBUG] Clicking outside dropdown, hiding it");
+        dropdown.style.display = "none";
+      }
+    });
 
-    console.log("[DEBUG] Segment fact check button inserted!");
+    // Also handle escape key to close dropdown
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && dropdown.style.display !== "none") {
+        console.log("[DEBUG] Escape key pressed, hiding dropdown");
+        dropdown.style.display = "none";
+      }
+    });
+
+    // Add the container, button, and dropdown to the control bar
+    container.appendChild(button);
+    document.body.appendChild(dropdown); // Keep dropdown in body for higher z-index
+
+    // Simply append to the control bar as before
+    controlBar.appendChild(container);
+    console.log("[DEBUG] Custom button appended to controls");
+
+    console.log("[DEBUG] Custom button with dropdown inserted!");
     return true;
   } catch (err) {
-    console.error("[DEBUG] injectSecondButton error:", err);
+    console.error("[DEBUG] injectFactCheckButton error:", err);
     return false;
   }
 }
-// ===== INITIALIZATION =====
+/**
+ * Reset button injection state when page changes
+ */
+function resetButtonInjectionState() {
+  buttonConfig.buttonInjected = false;
+  buttonConfig.injectionAttempts = 0;
+  buttonConfig.injectionInProgress = false;
+  buttonInjectionAttempts = 0; // Reset the global variable you're using
+}
+// ===== INITIALISATION =====
 
+/**
+ * Streamlined navigation detection and button injection
+ */
 function setupNavigationDetection() {
   console.log("[DEBUG] Setting up enhanced navigation detection...");
 
   // Monitor YouTube layout changes for sidebar adjustments
   monitorLayoutChanges();
 
-  // Standard YouTube navigation event listeners
+  // Primary method: MutationObserver to detect video player
+  const videoObserver = new MutationObserver((mutations) => {
+    // Only check if we don't have a button yet
+    if (!document.querySelector(".my-custom-button")) {
+      const videoElement = document.querySelector("video");
+      const playerControls = document.querySelector(".ytp-left-controls");
+
+      if (videoElement && playerControls && isVideoPage()) {
+        console.log("[DEBUG] Video and controls detected via MutationObserver");
+        setTimeout(() => injectFactCheckButton(), 500); // Short delay to ensure UI is ready
+      }
+    }
+  });
+
+  // Make sure we have a valid target to observe
+  const observeTarget =
+    document.getElementById("content") ||
+    document.body ||
+    document.documentElement;
+  if (observeTarget) {
+    videoObserver.observe(observeTarget, {
+      childList: true,
+      subtree: true,
+    });
+    console.log("[DEBUG] MutationObserver set up on", observeTarget.tagName);
+  }
+
+  // Primary event listeners for YouTube navigation
   document.addEventListener("yt-navigate-start", () => {
     console.log("[DEBUG] yt-navigate-start event detected");
     isActive = false; // Cancel pending asynchronous tasks
     resetUI();
+    resetButtonInjectionState();
   });
 
   document.addEventListener("yt-navigate-finish", () => {
     console.log("[DEBUG] yt-navigate-finish event detected");
     isActive = true; // Reset cancellation flag for new page
 
+    // Use a single delayed injection attempt after navigation
     if (isVideoPage()) {
-      setTimeout(injectFactCheckButton, 1000);
+      setTimeout(() => injectFactCheckButton(), 1000);
     }
   });
 
+  // Backup: Listen for player updates
   document.addEventListener("yt-player-updated", () => {
     console.log("[DEBUG] yt-player-updated event detected");
     if (isVideoPage()) {
@@ -1974,45 +2118,13 @@ function setupNavigationDetection() {
     }
   });
 
-  // MutationObserver to detect video element
-  const observer = new MutationObserver(() => {
-    if (isVideoPage() && !document.querySelector(".my-custom-button")) {
-      injectFactCheckButton();
-    }
-  });
-
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-  });
-
-  // Polling fallback for button injection
-  function checkForVideoAndInject() {
-    if (isVideoPage()) {
-      const videoElement = document.querySelector("video");
-      const playerControls = document.querySelector(".ytp-left-controls");
-      if (
-        videoElement &&
-        playerControls &&
-        !document.querySelector(".my-custom-button")
-      ) {
-        console.log(
-          "[DEBUG] Polling: Detected video and controls. Injecting button."
-        );
-        injectFactCheckButton();
-      }
-    }
-    setTimeout(checkForVideoAndInject, 500);
+  // Initial injection if already on a video page
+  if (isVideoPage()) {
+    setTimeout(() => injectFactCheckButton(), 1000);
   }
-  checkForVideoAndInject();
 
   // Clean up older cache entries periodically
   manageCacheSize();
-
-  // Initial injection attempt
-  if (isVideoPage()) {
-    setTimeout(injectFactCheckButton, 1000);
-  }
 }
 
 // Start the extension
