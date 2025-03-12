@@ -15,11 +15,11 @@ let sidebarVisible = false;
 
 let factCheckingInProgress = false;
 let factCheckTimeoutId = null;
-const FACT_CHECK_TIMEOUT = 22000; // 30 seconds timeout
+const FACT_CHECK_TIMEOUT = 30000; // 30 seconds timeout
 // Configuration object for button injection
 const buttonConfig = {
   injectionAttempts: 0,
-  maxAttempts: 3,
+  maxAttempts: 1,
   checkInterval: 500, // ms
   injectionDelay: 1000, // ms after navigation
   buttonInjected: false,
@@ -489,6 +489,9 @@ function hideSidebar(sidebarEl) {
   sidebarEl.classList.remove("visible");
   sidebarVisible = false;
 
+  // Try to close the transcript as well
+  hideTranscript();
+
   // Give animation time to complete before restoring layout
   setTimeout(() => {
     adjustYouTubeLayout(false);
@@ -498,53 +501,45 @@ function hideSidebar(sidebarEl) {
 
 // ===== TRANSCRIPT HANDLING =====
 
-function getYouTubeTranscript() {
-  console.log("[DEBUG] Getting transcript...");
+function hideTranscript() {
+  console.log("[DEBUG] Attempting to close YouTube transcript...");
 
-  const transcriptContainer = document.querySelector(
-    "ytd-transcript-segment-list-renderer"
+  // Look for the transcript close button
+  const transcriptCloseButton = document.querySelector(
+    "ytd-engagement-panel-section-list-renderer[target-id='engagement-panel-searchable-transcript'] #dismiss-button button"
   );
-  if (!transcriptContainer) {
-    console.warn("[DEBUG] Transcript container NOT found in DOM.");
-    return "";
-  }
-  console.log("[DEBUG] Transcript container FOUND in DOM.");
 
-  const segments = transcriptContainer.querySelectorAll(
-    "ytd-transcript-segment-renderer"
-  );
-  console.log("[DEBUG] Found", segments.length, "transcript segments.");
+  if (transcriptCloseButton) {
+    console.log("[DEBUG] Found transcript close button, clicking it");
+    transcriptCloseButton.click();
+    return true;
+  } else {
+    // Alternative method: try to find the panel and use its hide method
+    const transcriptPanel = document.querySelector(
+      "ytd-engagement-panel-section-list-renderer[target-id='engagement-panel-searchable-transcript']"
+    );
 
-  let transcriptText = "";
-  segments.forEach((segment, index) => {
-    const textEl = segment.querySelector("yt-formatted-string.segment-text");
-    if (textEl) {
-      transcriptText += textEl.innerText + " ";
-    } else {
-      console.warn(
-        `[DEBUG] Segment #${index} missing .segment-text in <yt-formatted-string>.`
-      );
+    if (transcriptPanel) {
+      console.log("[DEBUG] Found transcript panel, attempting to hide it");
+      // Check if it has a hidePanel method or similar
+      if (
+        transcriptPanel.dismissPanel &&
+        typeof transcriptPanel.dismissPanel === "function"
+      ) {
+        transcriptPanel.dismissPanel();
+        return true;
+      }
+
+      // If no method is available, try to set style or attribute
+      transcriptPanel.setAttribute("hidden", "");
+      transcriptPanel.style.display = "none";
+      return true;
     }
-  });
 
-  console.log("[DEBUG] Final transcript text length:", transcriptText.length);
-
-  // Hide transcript after getting text
-  const transcriptPanel = document.querySelector(
-    "ytd-transcript-renderer, ytd-engagement-panel-section-list-renderer[data-panel-identifier='transcript']"
-  );
-
-  if (transcriptContainer) {
-    transcriptContainer.style.display = "none";
+    console.warn("[DEBUG] Could not find transcript close button or panel");
+    return false;
   }
-
-  if (transcriptPanel) {
-    transcriptPanel.style.display = "none";
-  }
-
-  return transcriptText.trim();
 }
-
 async function clickMoreButton() {
   console.log("[DEBUG] clickMoreButton() called.");
 
@@ -612,92 +607,6 @@ async function clickShowTranscript() {
   return false;
 }
 
-async function getTranscriptWithRetry(videoId, userApiKey) {
-  console.log("[DEBUG] Attempting to auto-open the transcript...");
-
-  // 1) Click the "more..." button
-  const expanded = await clickMoreButton();
-  if (!expanded) {
-    console.warn(
-      "[DEBUG] Could not click the '...more' button. Will continue anyway."
-    );
-  }
-
-  // 2) Now try to find & click "Show transcript"
-  const transcriptOpened = await clickShowTranscript();
-  if (!transcriptOpened) {
-    console.warn(
-      "[DEBUG] Could not auto-open transcript. User may need to open manually."
-    );
-  }
-
-  // 3) Wait a bit for transcript to load
-  await new Promise((resolve) => setTimeout(resolve, 1200));
-
-  // 4) Get the transcript
-  const transcript = getYouTubeTranscript();
-  console.log(
-    "[DEBUG] Transcript length found:",
-    transcript ? transcript.length : 0
-  );
-
-  if (!transcript || transcript.length === 0) {
-    console.log(
-      "[DEBUG] No transcript found on first attempt. Will retry after 4 seconds..."
-    );
-
-    // Show a waiting message in the sidebar
-    initializeSidebarContent(
-      "Waiting for YouTube to load transcript (retrying in 4 seconds)..."
-    );
-
-    // Wait 5 seconds and try again
-    return new Promise((resolve) => {
-      setTimeout(async () => {
-        // Only proceed if the context is still active
-        if (!isActive) {
-          resolve("");
-          return;
-        }
-
-        console.log(
-          "[DEBUG] Retrying transcript retrieval after 5 second delay..."
-        );
-
-        // Try once more to click the buttons if needed
-        await clickMoreButton();
-        await clickShowTranscript();
-
-        // Give some time for the transcript to load
-        await new Promise((wait) => setTimeout(wait, 1200));
-
-        // Retry getting the transcript
-        const retryTranscript = getYouTubeTranscript();
-        console.log(
-          "[DEBUG] Retry transcript length found:",
-          retryTranscript ? retryTranscript.length : 0
-        );
-
-        if (!retryTranscript || retryTranscript.length === 0) {
-          console.warn("[DEBUG] No transcript available even after retry.");
-          initializeSidebarContent(`
-            <p>We couldn't automatically open the transcript after retrying. To fact-check this video, please open the transcript manually:</p>
-            <ol>
-              <li>Click <strong>more...</strong> under the video.</li>
-              <li>Select <strong>Show transcript</strong>.</li>
-              <li>Reopen this sidebar to see the results.</li>
-            </ol>
-          `);
-          resolve("");
-        } else {
-          resolve(retryTranscript);
-        }
-      }, 4000); // 5 second delay for retry
-    });
-  }
-
-  return transcript;
-}
 function getCurrentVideoTimeWindow() {
   const video = document.querySelector("video");
   if (!video) {
@@ -747,6 +656,60 @@ function formatTimeStamp(timeInSeconds) {
       .toString()
       .padStart(2, "0")}`;
   }
+}
+function getYouTubeFullTranscript() {
+  console.log("[DEBUG] Getting full video transcript...");
+
+  const transcriptContainer = document.querySelector(
+    "ytd-transcript-segment-list-renderer"
+  );
+  if (!transcriptContainer) {
+    console.warn("[DEBUG] Transcript container NOT found in DOM.");
+    return "";
+  }
+  console.log("[DEBUG] Transcript container FOUND in DOM.");
+
+  const segments = transcriptContainer.querySelectorAll(
+    "ytd-transcript-segment-renderer"
+  );
+  console.log("[DEBUG] Found", segments.length, "transcript segments.");
+
+  let transcriptText = "";
+  let segmentCount = 0;
+
+  segments.forEach((segment) => {
+    try {
+      // Extract timestamp from the segment
+      const timestampEl = segment.querySelector(".segment-timestamp");
+      if (!timestampEl) {
+        console.warn("[DEBUG] No timestamp element found in segment");
+        return; // Skip if no timestamp found
+      }
+
+      // Get timestamp text
+      const timestampText = timestampEl.textContent.trim();
+
+      // Get segment text
+      const textEl = segment.querySelector("yt-formatted-string.segment-text");
+      if (textEl) {
+        // Add timestamp to each segment for context
+        transcriptText += `[${timestampText}] ${textEl.textContent.trim()} `;
+        segmentCount++;
+      } else {
+        console.warn(
+          "[DEBUG] No text element found for segment at timestamp",
+          timestampText
+        );
+      }
+    } catch (error) {
+      console.error("[DEBUG] Error processing transcript segment:", error);
+    }
+  });
+
+  console.log(`[DEBUG] Processed ${segmentCount} segments for full transcript`);
+  console.log("[DEBUG] Full transcript text length:", transcriptText.length);
+
+  return transcriptText.trim();
 }
 function getYouTubeTranscriptSegment(startTimeSeconds, endTimeSeconds) {
   console.log(
@@ -1206,170 +1169,17 @@ function addDisclaimerToSidebar() {
   }
 }
 
-async function processFactCheck(transcript, userApiKey, videoId) {
-  console.log(
-    "[DEBUG] Processing fact check with transcript length:",
-    transcript.length
-  );
-
-  // Initialize the enhanced sidebar with loading state
-  sidebar.innerHTML = `
-    <button id="sidebar-close" aria-label="Close Sidebar">&times;</button>
-    <h2>Fact Check</h2>
-    <div id="fact-check-container">
-      <div id="video-info">
-        <div id="current-timestamp"></div>
-      </div>
-      <div id="fact-check-result" class="markdown-content loading">
-        <div class="fact-status partial">Analyzing Video...</div>
-      </div>
-    </div>
-  `;
-
+// Helper function to add source citation
+function addSourceCitationToSidebar(sourceText) {
   const factCheckResultDiv = document.getElementById("fact-check-result");
-  const userPrompt = `# FACT-CHECKING YOUTUBE VIDEOS
+  if (!factCheckResultDiv) return;
 
-Analyze the transcript and proceed directly to examining the key factual claims without any explanatory introduction.
-
-## FORMAT EACH CLAIM AS FOLLOWS:
-
-### CLAIM #[number]: "[Direct quote]" [TIMESTAMP REQUIRED - HH:MM:SS or MM:SS format]
-
-#### VERDICT:
-- **Rating**: [Correct | Partially Correct | Incorrect | Misleading]
-- **Explanation**: Provide a clear 2-3 sentence explanation of why this claim is true, false, or partially accurate, focusing on factual evidence.
-
-#### EVIDENCE:
-- Cite 2-3 relevant authoritative sources that verify or refute the claim
-- Format each source as: "[Source name] ([Publication date]): [Brief description of relevant finding]"
-- Prioritize academic research, official statistics, and recognized expert organizations
-- Include accessible URLs where available
-
-#### CONTEXT:
-- Include essential missing context needed for full understanding
-- If relevant, note any significant alternative perspective in 1-2 sentences
-- For incorrect claims, provide the accurate information concisely
-
-## OVERALL ASSESSMENT:
-
-### SUMMARY:
-- Provide a brief summary of the video's factual reliability (2-3 sentences)
-- Note the proportion of accurate vs. inaccurate claims
-
-### FINAL VERDICT: 
-- **Rating**: [Factually Accurate | Partially Accurate | Factually Inaccurate]
-- **Explanation**: [1-2 sentence justification for the rating]
-
-### KEY SOURCES CONSULTED:
-- List 3-5 main authoritative sources used across all claims
-- Format as bullet points with full citations
-
-## RESPONSE LENGTH GUIDELINES:
-- Videos under 3 minutes: Analyze 1-2 main claims, response under 300 words
-- Videos 3-10 minutes: Analyze 2-3 main claims, response under 500 words
-- Videos over 10 minutes: Analyze maximum of 4 main claims, under 800 words
-- Keep all explanations brief and evidence-focused
-
-IMPORTANT: 
-1. Begin your analysis immediately with the first claim
-2. Every claim MUST include a timestamp in the format HH:MM:SS or MM:SS
-3. Do not include any explanatory preamble or restate these instructions`;
-  console.log(
-    "[DEBUG] Sending transcript + prompt to callGoogleGenAIStream..."
-  );
-
-  let currentFactStatus = "partial"; // Default status
-
-  // Callback to update the UI with each incoming chunk.
-  const onPartialUpdate = (accumulatedText, isFinal = false) => {
-    // Check if we're still in active fact-checking mode
-    if (!factCheckingInProgress) {
-      return; // Skip updates if fact-checking was cancelled or timed out
-    }
-
-    // Remove loading class once we start getting content
-    factCheckResultDiv.classList.remove("loading");
-
-    // For the final update, we definitely want to use the OVERALL ASSESSMENT
-    // Otherwise, use our progressive determination logic
-    if (isFinal) {
-      currentFactStatus = determineFactStatus(accumulatedText);
-    } else {
-      currentFactStatus = determineFactStatus(accumulatedText);
-    }
-
-    // Create status indicator based on determined status
-    let statusHtml = "";
-    if (currentFactStatus === "true") {
-      statusHtml = '<div class="fact-status true">Factually Accurate</div>';
-    } else if (currentFactStatus === "false") {
-      statusHtml = '<div class="fact-status false">Factually Inaccurate</div>';
-    } else {
-      statusHtml = '<div class="fact-status partial">Partially Accurate</div>';
-    }
-
-    // If this is the final update, reprocess the entire markdown for clean rendering
-    if (isFinal) {
-      console.log("[DEBUG] Final response received, refreshing markdown");
-      factCheckResultDiv.innerHTML = statusHtml + marked.parse(accumulatedText);
-    } else {
-      // For streaming updates, render as we go
-      factCheckResultDiv.innerHTML = statusHtml + marked.parse(accumulatedText);
-    }
-  };
-
-  try {
-    const finalText = await callGoogleGenAIStream(
-      userApiKey,
-      transcript,
-      userPrompt,
-      onPartialUpdate
-    );
-    console.log("[DEBUG] LLM call complete. Sidebar updated.");
-
-    // Reset the fact checking status
-    factCheckingInProgress = false;
-    if (factCheckTimeoutId !== null) {
-      clearTimeout(factCheckTimeoutId);
-      factCheckTimeoutId = null;
-    }
-
-    if (finalText && finalText.length >= 200) {
-      console.log("[DEBUG] Response length sufficient, caching result");
-      cacheFactCheckResult(videoId, finalText, currentFactStatus);
-    } else {
-      console.warn(
-        "[DEBUG] Response too short (length: " +
-          (finalText ? finalText.length : 0) +
-          "), not caching"
-      );
-    }
-
-    // Add source citation section if not already present
-    if (!document.querySelector(".source-citation")) {
-      const sourceSection = document.createElement("div");
-      sourceSection.className = "source-citation";
-      sourceSection.innerHTML =
-        "Analysis based on video transcript and available information as of the fact check time.";
-      factCheckResultDiv.appendChild(sourceSection);
-    }
-
-    // Add disclaimer
-    addDisclaimerToSidebar();
-  } catch (error) {
-    // Reset the fact checking status
-    factCheckingInProgress = false;
-    if (factCheckTimeoutId !== null) {
-      clearTimeout(factCheckTimeoutId);
-      factCheckTimeoutId = null;
-    }
-
-    factCheckResultDiv.innerHTML = `
-      <div class="fact-status false">Error</div>
-      <p>Error: ${error.message}</p>
-      <p>Please try again or check your API key configuration.</p>
-    `;
-    console.error("[DEBUG] Error calling LLM:", error);
+  // Add source citation section if not already present
+  if (!document.querySelector(".source-citation")) {
+    const sourceSection = document.createElement("div");
+    sourceSection.className = "source-citation";
+    sourceSection.innerHTML = `Analysis based on ${sourceText}`;
+    factCheckResultDiv.appendChild(sourceSection);
   }
 }
 async function processSegmentFactCheck(timeWindow, userApiKey, videoId) {
@@ -1454,15 +1264,22 @@ Focus ONLY on claims made within this specific time segment.
 
 ## FORMAT EACH CLAIM AS FOLLOWS:
 
-### CLAIM #[number]: "[Direct quote]" [TIMESTAMP]
+### CLAIM #[number]: "[Direct quote]" [TIMESTAMP REQUIRED - HH:MM:SS or MM:SS format]
 
 #### VERDICT:
 - **Rating**: [Correct | Partially Correct | Incorrect | Misleading]
 - **Explanation**: Provide a clear 2-3 sentence explanation of why this claim is true, false, or partially accurate, focusing on factual evidence.
 
+#### CONTEXT:
+- Include essential missing context needed for full understanding
+- If relevant, note any significant alternative perspective in 1-2 sentences
+
+- For incorrect claims, provide the accurate information concisely
 #### EVIDENCE:
 - Cite 2-3 relevant authoritative sources that verify or refute the claim
 - Format each source as: "[Source name] ([Publication date]): [Brief description of relevant finding]"
+- Prioritize academic research, official statistics, and recognized expert organizations
+- Include accessible URLs where available
 
 ## OVERALL ASSESSMENT:
 
@@ -1475,6 +1292,7 @@ Focus ONLY on claims made within this specific time segment.
 
 ### KEY SOURCES CONSULTED:
 - List 2-3 main authoritative sources used
+- Format as bullet points with full citations
 
 IMPORTANT: 
 1. Begin your analysis immediately with the first claim
@@ -1487,27 +1305,51 @@ IMPORTANT:
 
   // Define the callback to update the UI with each incoming chunk
   const onPartialUpdate = (accumulatedText, isFinal = false) => {
-    // Check if we're still in active fact-checking mode
-    if (!factCheckingInProgress) {
-      return; // Skip updates if fact-checking was cancelled or timed out
+    // Debug the fact-checking status to see why it's being set to false
+    console.log(
+      "[DEBUG] onPartialUpdate called, factCheckingInProgress:",
+      factCheckingInProgress
+    );
+
+    // Skip updates only if the extension is no longer active or if we're purposely stopping
+    // DO NOT check factCheckingInProgress here as it might be set to false prematurely
+    if (!isActive) {
+      console.log("[DEBUG] Extension no longer active, skipping update");
+      return;
     }
 
+    // Make sure element still exists
+    const resultDiv = document.getElementById("fact-check-result");
+    if (!resultDiv) {
+      console.error(
+        "[DEBUG] fact-check-result element not found during update"
+      );
+      return;
+    }
+
+    console.log(
+      "[DEBUG] Updating UI with text chunk, length:",
+      accumulatedText.length
+    );
+
     // Remove loading class once we start getting content
-    factCheckResultDiv.classList.remove("loading");
+    resultDiv.classList.remove("loading");
 
     // For the final update, we definitely want to use the OVERALL ASSESSMENT
     // Otherwise, use our progressive determination logic
+    let currentStatus;
     if (isFinal) {
-      currentFactStatus = determineFactStatus(accumulatedText);
+      currentStatus = determineFactStatus(accumulatedText);
+      console.log("[DEBUG] Final update, fact status:", currentStatus);
     } else {
-      currentFactStatus = determineFactStatus(accumulatedText);
+      currentStatus = determineFactStatus(accumulatedText);
     }
 
     // Create status indicator based on determined status
     let statusHtml = "";
-    if (currentFactStatus === "true") {
+    if (currentStatus === "true") {
       statusHtml = '<div class="fact-status true">Factually Accurate</div>';
-    } else if (currentFactStatus === "false") {
+    } else if (currentStatus === "false") {
       statusHtml = '<div class="fact-status false">Factually Inaccurate</div>';
     } else {
       statusHtml = '<div class="fact-status partial">Partially Accurate</div>';
@@ -1515,13 +1357,11 @@ IMPORTANT:
 
     // If this is the final update, reprocess the entire markdown for clean rendering
     if (isFinal) {
-      console.log(
-        "[DEBUG] Final segment response received, refreshing markdown"
-      );
-      factCheckResultDiv.innerHTML = statusHtml + marked.parse(accumulatedText);
+      console.log("[DEBUG] Final response received, refreshing markdown");
+      resultDiv.innerHTML = statusHtml + marked.parse(accumulatedText);
     } else {
       // For streaming updates, render as we go
-      factCheckResultDiv.innerHTML = statusHtml + marked.parse(accumulatedText);
+      resultDiv.innerHTML = statusHtml + marked.parse(accumulatedText);
     }
   };
 
@@ -1584,46 +1424,43 @@ IMPORTANT:
     console.error("[DEBUG] Error calling LLM:", error);
   }
 }
-async function handleFactCheck(videoId, userApiKey) {
-  // Clear any existing timeout
-  if (factCheckTimeoutId !== null) {
-    clearTimeout(factCheckTimeoutId);
-    factCheckTimeoutId = null;
-  }
 
-  // Set the fact checking status
-  factCheckingInProgress = true;
+async function processFullVideoFactCheck(userApiKey, videoId) {
+  console.log(`[DEBUG] Processing fact check for entire video`);
 
-  // Start a new timeout for this fact check attempt
-  factCheckTimeoutId = setTimeout(() => {
-    // Only proceed if we're still loading
-    if (factCheckingInProgress) {
-      console.log("[DEBUG] Fact check timeout reached. Restarting process...");
-      factCheckingInProgress = false;
-      factCheckTimeoutId = null;
+  // Get video title for a more personalized analysis
+  const videoTitle =
+    document.querySelector("h1.ytd-watch-metadata yt-formatted-string")
+      ?.textContent || "YouTube Video";
 
-      // Update the sidebar to show we're restarting
-      const factCheckResultDiv = document.getElementById("fact-check-result");
-      if (factCheckResultDiv) {
-        factCheckResultDiv.classList.add("loading");
-        factCheckResultDiv.innerHTML = `
-          <div class="fact-status partial">Restarting Analysis...</div>
-          <p>The previous attempt took too long. Restarting fact check process...</p>
-        `;
-      }
+  // Initialize the enhanced sidebar with loading state
+  sidebar.innerHTML = `
+    <button id="sidebar-close" aria-label="Close Sidebar">&times;</button>
+    <h2>Full Video Fact Check</h2>
+    <div id="fact-check-container">
+      <div id="video-info">
+        <div id="current-video-title">${videoTitle}</div>
+      </div>
+      <div id="fact-check-result" class="markdown-content loading">
+        <div class="fact-status partial">Analyzing Full Video...</div>
+      </div>
+    </div>
+  `;
 
-      // Retry the fact check
-      setTimeout(() => {
-        handleFactCheck(videoId, userApiKey);
-      }, 1000); // Wait a second before restarting
-    }
-  }, FACT_CHECK_TIMEOUT);
+  const factCheckResultDiv = document.getElementById("fact-check-result");
+
+  // Get transcript with retry logic
+  await clickMoreButton();
+  await clickShowTranscript();
+
+  // Wait a bit for transcript to load
+  await new Promise((resolve) => setTimeout(resolve, 1500));
 
   // Check if we have a cached result
-  const cachedResult = await getCachedFactCheck(videoId);
-
+  const fullVideoKey = `${videoId}_full`; // Add _full suffix to distinguish from segment checks
+  const cachedResult = await getCachedFactCheck(fullVideoKey);
   if (cachedResult) {
-    console.log("[DEBUG] Using cached fact check result");
+    console.log("[DEBUG] Using cached full video fact check result");
     factCheckingInProgress = false;
     clearTimeout(factCheckTimeoutId); // Clear the timeout since we have a result
     factCheckTimeoutId = null;
@@ -1631,33 +1468,221 @@ async function handleFactCheck(videoId, userApiKey) {
     return;
   }
 
-  // Get transcript with retry logic
-  const transcript = await getTranscriptWithRetry(videoId, userApiKey);
+  // Get the full transcript
+  const transcript = getYouTubeFullTranscript();
 
-  if (transcript && transcript.length > 0) {
-    await processFactCheck(transcript, userApiKey, videoId);
-    factCheckingInProgress = false;
-    clearTimeout(factCheckTimeoutId); // Clear the timeout since we have completed
-    factCheckTimeoutId = null;
-  } else {
-    factCheckingInProgress = false;
-    clearTimeout(factCheckTimeoutId); // Clear the timeout since we've hit an error condition
-    factCheckTimeoutId = null;
+  if (!transcript || transcript.length === 0) {
+    factCheckResultDiv.classList.remove("loading");
+    factCheckResultDiv.innerHTML = `
+      <div class="fact-status false">Error</div>
+      <p>Couldn't find transcript for this video.</p>
+      <p>Make sure the transcript is available and try again.</p>
+    `;
+    return;
+  }
 
-    // Update sidebar with error message about transcript unavailability
-    const factCheckResultDiv = document.getElementById("fact-check-result");
-    if (factCheckResultDiv) {
-      factCheckResultDiv.classList.remove("loading");
-      factCheckResultDiv.innerHTML = `
-        <div class="fact-status false">Error</div>
-        <p>We couldn't obtain the transcript for this video. Please try one of the following:</p>
-        <ul>
-          <li>Check if this video has captions/transcript available</li>
-          <li>Try opening the transcript manually and then clicking the fact check button again</li>
-          <li>Refresh the page and try again</li>
-        </ul>
-      `;
+  console.log(
+    `[DEBUG] Using full transcript with length: ${transcript.length}`
+  );
+
+  // Check if transcript is too long and needs truncation
+  let processedTranscript = transcript;
+  const MAX_TRANSCRIPT_LENGTH = 15000; // About 15k chars to stay within API limits
+
+  if (transcript.length > MAX_TRANSCRIPT_LENGTH) {
+    console.log(
+      `[DEBUG] Transcript too long (${transcript.length} chars), truncating to ${MAX_TRANSCRIPT_LENGTH}`
+    );
+    processedTranscript = transcript.substring(0, MAX_TRANSCRIPT_LENGTH);
+
+    // Add note to UI about truncation
+    const noteDiv = document.createElement("div");
+    noteDiv.className = "transcript-note";
+    noteDiv.innerHTML = `<p><em>Note: This video's transcript is very long. Analysis is based on the first portion of the video.</em></p>`;
+    factCheckResultDiv.appendChild(noteDiv);
+  }
+
+  const userPrompt = `# FACT-CHECKING YOUTUBE VIDEO
+
+Analyze the transcript and proceed directly to examining the key factual claims without any explanatory introduction.
+
+## FORMAT EACH CLAIM AS FOLLOWS:
+
+### CLAIM #[number]: "[Direct quote]" [TIMESTAMP REQUIRED - HH:MM:SS or MM:SS format]
+
+#### VERDICT:
+- **Rating**: [Correct | Partially Correct | Incorrect | Misleading]
+- **Explanation**: Provide a clear 2-3 sentence explanation of why this claim is true, false, or partially accurate, focusing on factual evidence.
+
+#### EVIDENCE:
+- Cite 2-3 relevant authoritative sources that verify or refute the claim
+- Format each source as: "[Source name] ([Publication date]): [Brief description of relevant finding]"
+- Prioritize academic research, official statistics, and recognized expert organizations
+- Include accessible URLs where available
+
+#### CONTEXT:
+- Include essential missing context needed for full understanding
+- If relevant, note any significant alternative perspective in 1-2 sentences
+- For incorrect claims, provide the accurate information concisely
+
+## OVERALL ASSESSMENT:
+
+### SUMMARY:
+- Provide a brief summary of the video's factual reliability (2-3 sentences)
+- Note the proportion of accurate vs. inaccurate claims
+
+### FINAL VERDICT: 
+- **Rating**: [Factually Accurate | Partially Accurate | Factually Inaccurate]
+- **Explanation**: [1-2 sentence justification for the rating]
+
+### KEY SOURCES CONSULTED:
+- List 3-5 main authoritative sources used across all claims
+- Format as bullet points with full citations
+
+## RESPONSE LENGTH GUIDELINES:
+- Videos under 3 minutes: Analyze 1-2 main claims, response under 300 words
+- Videos 3-10 minutes: Analyze 2-3 main claims, response under 500 words
+- Videos over 10 minutes: Analyze maximum of 4 main claims, under 800 words
+- Keep all explanations brief and evidence-focused
+
+IMPORTANT: 
+1. Begin your analysis immediately with the first claim
+2. Every claim MUST include a timestamp in the format HH:MM:SS or MM:SS
+3. Focus on claims that are central to the video's main argument
+4. Do not include any explanatory preamble or restate these instructions`;
+
+  // Define current fact status variable
+  let currentFactStatus = "partial"; // Default status
+
+  // Define the callback to update the UI with each incoming chunk
+  const onPartialUpdate = (accumulatedText, isFinal = false) => {
+    // Debug the fact-checking status
+    console.log(
+      "[DEBUG] onPartialUpdate called, factCheckingInProgress:",
+      factCheckingInProgress
+    );
+
+    // Skip updates only if the extension is no longer active
+    if (!isActive) {
+      console.log("[DEBUG] Extension no longer active, skipping update");
+      return;
     }
+
+    // Make sure element still exists
+    const resultDiv = document.getElementById("fact-check-result");
+    if (!resultDiv) {
+      console.error(
+        "[DEBUG] fact-check-result element not found during update"
+      );
+      return;
+    }
+
+    console.log(
+      "[DEBUG] Updating UI with text chunk, length:",
+      accumulatedText.length
+    );
+
+    // Remove loading class once we start getting content
+    resultDiv.classList.remove("loading");
+
+    // Determine current status
+    let currentStatus;
+    if (isFinal) {
+      currentStatus = determineFactStatus(accumulatedText);
+      console.log("[DEBUG] Final update, fact status:", currentStatus);
+    } else {
+      currentStatus = determineFactStatus(accumulatedText);
+    }
+
+    // Update the current fact status for potential caching
+    currentFactStatus = currentStatus;
+
+    // Create status indicator based on determined status
+    let statusHtml = "";
+    if (currentStatus === "true") {
+      statusHtml = '<div class="fact-status true">Factually Accurate</div>';
+    } else if (currentStatus === "false") {
+      statusHtml = '<div class="fact-status false">Factually Inaccurate</div>';
+    } else {
+      statusHtml = '<div class="fact-status partial">Partially Accurate</div>';
+    }
+
+    // If this is the final update, reprocess the entire markdown for clean rendering
+    if (isFinal) {
+      console.log("[DEBUG] Final response received, refreshing markdown");
+      resultDiv.innerHTML = statusHtml + marked.parse(accumulatedText);
+    } else {
+      // For streaming updates, render as we go
+      resultDiv.innerHTML = statusHtml + marked.parse(accumulatedText);
+    }
+  };
+
+  try {
+    const finalText = await callGoogleGenAIStream(
+      userApiKey,
+      processedTranscript,
+      userPrompt,
+      onPartialUpdate
+    );
+    console.log("[DEBUG] LLM call complete for full video. Sidebar updated.");
+
+    // Reset the fact checking status
+    factCheckingInProgress = false;
+    if (factCheckTimeoutId !== null) {
+      clearTimeout(factCheckTimeoutId);
+      factCheckTimeoutId = null;
+    }
+
+    if (finalText && finalText.length >= 200) {
+      console.log("[DEBUG] Response length sufficient, caching result");
+      cacheFactCheckResult(`${videoId}_full`, finalText, currentFactStatus);
+
+      // Ensure the final result is visible with a forced update
+      // First determine the final status
+      const finalStatus = determineFactStatus(finalText);
+
+      // Create status indicator based on determined status
+      let statusHtml = "";
+      if (finalStatus === "true") {
+        statusHtml = '<div class="fact-status true">Factually Accurate</div>';
+      } else if (finalStatus === "false") {
+        statusHtml =
+          '<div class="fact-status false">Factually Inaccurate</div>';
+      } else {
+        statusHtml =
+          '<div class="fact-status partial">Partially Accurate</div>';
+      }
+
+      // Force a final update
+      factCheckResultDiv.innerHTML = statusHtml + marked.parse(finalText);
+      console.log("[DEBUG] Forced final update to sidebar content");
+    } else {
+      console.warn(
+        "[DEBUG] Response too short (length: " +
+          (finalText ? finalText.length : 0) +
+          "), not caching"
+      );
+    }
+
+    // Add source citation
+    addSourceCitationToSidebar("Full video transcript");
+
+    // Add disclaimer
+    addDisclaimerToSidebar();
+  } catch (error) {
+    // Reset the fact checking status
+    factCheckingInProgress = false;
+    if (factCheckTimeoutId !== null) {
+      clearTimeout(factCheckTimeoutId);
+      factCheckTimeoutId = null;
+    }
+
+    factCheckResultDiv.innerHTML = `
+      <div class="fact-status false">Error</div>
+      <p>Error: ${error.message}</p>
+      <p>Please try again or check your API key configuration.</p>
+    `;
+    console.error("[DEBUG] Error calling LLM for full video:", error);
   }
 }
 // ===== BUTTON INJECTION =====
@@ -1910,30 +1935,53 @@ function injectFactCheckButton() {
       );
     }
 
-    // Add event listeners for dropdown options
     fullCheckOption.addEventListener("click", async () => {
       dropdown.style.display = "none"; // Hide dropdown after selection
-
-      // Toggle sidebar and show loading state
-      toggleSidebar(true); // Shows sidebar
-      initializeSidebarContent("Loading...");
 
       // Get the current video ID
       const videoId = getYouTubeVideoId();
       if (!videoId) {
         console.warn("[DEBUG] Could not determine video ID");
-        initializeSidebarContent("Error: Could not determine video ID.");
         return;
       }
+
+      // Show the sidebar with loading message
+      toggleSidebar(true);
+      initializeSidebarContent("Loading fact check for the entire video...");
+
+      // Clear any existing timeout
+      if (factCheckTimeoutId !== null) {
+        clearTimeout(factCheckTimeoutId);
+        factCheckTimeoutId = null;
+      }
+
+      // Set the fact checking status
+      factCheckingInProgress = true;
+
+      // Start a new timeout for this fact check attempt (maybe longer for full videos)
+      factCheckTimeoutId = setTimeout(() => {
+        if (factCheckingInProgress) {
+          console.log("[DEBUG] Full video fact check timeout reached.");
+          factCheckingInProgress = false;
+          factCheckTimeoutId = null;
+
+          // Update sidebar with timeout message
+          const factCheckResultDiv =
+            document.getElementById("fact-check-result");
+          if (factCheckResultDiv) {
+            factCheckResultDiv.classList.remove("loading");
+            factCheckResultDiv.innerHTML = `
+              <div class="fact-status false">Timeout</div>
+              <p>The full video fact check took too long to complete. Please try again or use segment fact check instead.</p>
+            `;
+          }
+        }
+      }, FACT_CHECK_TIMEOUT); // Double timeout for full video
 
       // Retrieve the saved API key and start fact-checking
       chrome.storage.sync.get("apiKey", async (data) => {
         if (!isActive) return; // Abort if the context is invalid
         const userApiKey = data.apiKey;
-        console.log(
-          "[DEBUG] Retrieved API key from storage:",
-          userApiKey ? "(hidden)" : "None found"
-        );
 
         if (!userApiKey) {
           initializeSidebarContent(
@@ -1942,7 +1990,7 @@ function injectFactCheckButton() {
           return;
         }
 
-        await handleFactCheck(videoId, userApiKey);
+        await processFullVideoFactCheck(userApiKey, videoId);
       });
     });
 

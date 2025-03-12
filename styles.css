@@ -250,7 +250,7 @@ html[dark-theme="true"] {
 #fact-check-result.loading::after {
   content: "";
   position: absolute;
-  top: 50%;
+  top: 60%;
   left: 50%;
   transform: translate(-50%, -50%);
   width: 24px;
