@@ -3,7 +3,6 @@ let cachedIconUrl;
 try {
   cachedIconUrl = chrome.runtime.getURL("icons/my-icon-white.png");
 } catch (error) {
-  console.error("[DEBUG] Could not get icon URL:", error);
   cachedIconUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAU..."; // fallback
 }
 
@@ -15,7 +14,7 @@ let sidebarVisible = false;
 
 let factCheckingInProgress = false;
 let factCheckTimeoutId = null;
-const FACT_CHECK_TIMEOUT = 30000; // 30 seconds timeout
+const FACT_CHECK_TIMEOUT = 35000; // 30 seconds timeout
 // Configuration object for button injection
 const buttonConfig = {
   injectionAttempts: 0,
@@ -27,29 +26,6 @@ const buttonConfig = {
 };
 
 // ===== UTILITY FUNCTIONS =====
-
-function waitForElement(selector, timeout = 5000) {
-  console.log("[DEBUG] waitForElement called for:", selector);
-  return new Promise((resolve, reject) => {
-    const interval = 100;
-    let elapsed = 0;
-
-    function check() {
-      const el = document.querySelector(selector);
-      if (el) {
-        console.log("[DEBUG] Found element:", selector);
-        resolve(el);
-      } else if (elapsed >= timeout) {
-        console.warn("[DEBUG] Element not found within timeout:", selector);
-        reject(new Error("Element not found: " + selector));
-      } else {
-        elapsed += interval;
-        setTimeout(check, interval);
-      }
-    }
-    check();
-  });
-}
 
 function getYouTubeVideoId() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -76,8 +52,6 @@ function isVideoPage() {
 }
 
 function resetUI() {
-  console.log("[DEBUG] Resetting UI state...");
-
   // Reset button injection state
   resetButtonInjectionState();
 
@@ -99,13 +73,11 @@ function resetUI() {
   const existingContainer = document.querySelector(".custom-buttons-container");
   if (existingContainer) {
     existingContainer.remove();
-    console.log("[DEBUG] Removed existing button container");
   } else {
     // If no container, check for standalone button
     const existingButton = document.querySelector(".my-custom-button");
     if (existingButton) {
       existingButton.remove();
-      console.log("[DEBUG] Removed existing button");
     }
   }
 
@@ -137,22 +109,17 @@ function getYouTubeLayoutMode() {
 }
 
 function disableTheaterMode() {
-  console.log("[DEBUG] Attempting to disable theater mode");
-
   const watchElement = document.querySelector("ytd-watch-flexy");
   if (watchElement && watchElement.hasAttribute("theater")) {
-    console.log("[DEBUG] Found video in theater mode");
-
     // Look for the theater mode button and click it
     const theaterButton = document.querySelector(".ytp-size-button");
     if (theaterButton) {
-      console.log("[DEBUG] Found theater button, clicking it");
       theaterButton.click();
       return true;
     }
 
     // Try keyboard shortcut as last resort
-    console.log("[DEBUG] Trying keyboard shortcut");
+
     document.dispatchEvent(
       new KeyboardEvent("keydown", {
         key: "t",
@@ -164,13 +131,10 @@ function disableTheaterMode() {
     return true;
   }
 
-  console.log("[DEBUG] Not in theater mode or element not found");
   return false;
 }
 
 function adjustYouTubeLayout(show) {
-  console.log("[DEBUG] Adjusting YouTube layout, show:", show);
-
   // Get YouTube's main elements
   const secondary = document.querySelector("#secondary");
   const primary = document.querySelector("#primary");
@@ -195,7 +159,6 @@ function adjustYouTubeLayout(show) {
 
     // Hide YouTube's secondary (recommendations) without changing layout
     if (secondary) {
-      console.log("[DEBUG] secondary if hit");
       secondary.style.visibility = "hidden";
       secondary.style.opacity = "0";
       secondary.style.pointerEvents = "none";
@@ -231,12 +194,10 @@ function getYouTubeSecondaryWidth() {
   const secondary = document.querySelector("#secondary");
   if (secondary) {
     const computedWidth = window.getComputedStyle(secondary).width;
-    console.log("[DEBUG] YouTube secondary width:", computedWidth);
+
     return computedWidth;
   }
-  console.log(
-    "[DEBUG] YouTube secondary element not found, using fallback width"
-  );
+
   return "426px";
 }
 
@@ -249,8 +210,6 @@ function monitorLayoutChanges() {
         (mutation.attributeName === "theater" ||
           mutation.attributeName === "fullscreen")
       ) {
-        console.log("[DEBUG] YouTube layout changed:", getYouTubeLayoutMode());
-
         if (sidebarVisible) {
           const currentMode = getYouTubeLayoutMode();
           if (currentMode !== "default") {
@@ -275,7 +234,6 @@ function monitorLayoutChanges() {
   const watchElement = document.querySelector("ytd-watch-flexy");
   if (watchElement) {
     layoutObserver.observe(watchElement, { attributes: true });
-    console.log("[DEBUG] Monitoring YouTube layout changes");
   }
 
   // Observe the player area for size changes
@@ -289,7 +247,6 @@ function monitorLayoutChanges() {
 
 function ensureSidebarExists() {
   if (!sidebar) {
-    console.log("[DEBUG] Creating new sidebar element");
     sidebar = document.createElement("div");
     sidebar.id = "my-extension-sidebar";
     document.body.appendChild(sidebar);
@@ -297,12 +254,9 @@ function ensureSidebarExists() {
     // Set up event delegation for close button
     document.addEventListener("click", (e) => {
       if (e.target && e.target.id === "sidebar-close") {
-        console.log("[DEBUG] Close button clicked");
         toggleSidebar(false);
       }
     });
-
-    console.log("[DEBUG] Sidebar element created and added to DOM");
 
     // Initial position sizing
     updateSidebarPosition(sidebar);
@@ -358,14 +312,12 @@ function updateSidebarPosition(sidebarEl) {
   if (secondary) {
     // Ensure the element is visible and rendered
     if (window.getComputedStyle(secondary).display === "none") {
-      console.log("[DEBUG] Secondary element is hidden, using fallback");
       useFallbackDimensions(sidebarEl);
       return;
     }
 
     // Get the rect after ensuring visibility
     const secondaryRect = secondary.getBoundingClientRect();
-    console.log("[DEBUG] Secondary element position:", secondaryRect);
 
     // If width is still 0, try to get width from computed style
     let sidebarWidth = secondaryRect.width;
@@ -375,11 +327,9 @@ function updateSidebarPosition(sidebarEl) {
 
       if (computedWidth > 0) {
         sidebarWidth = computedWidth;
-        console.log("[DEBUG] Using computed width:", sidebarWidth);
       } else {
         // Try to measure offsetWidth as a last resort
         sidebarWidth = secondary.offsetWidth;
-        console.log("[DEBUG] Using offsetWidth:", sidebarWidth);
 
         // If still zero, fall back to a default
         if (sidebarWidth === 0) {
@@ -399,8 +349,6 @@ function updateSidebarPosition(sidebarEl) {
     // Calculate the right position when hidden (for animation)
     const hiddenRight = -(sidebarWidth + additionalWidth) - 32; // Width plus padding
     sidebarEl.style.right = `${hiddenRight}px`;
-
-    console.log("[DEBUG] Set sidebar width to", sidebarWidth, "px");
   } else {
     useFallbackDimensions(sidebarEl);
   }
@@ -423,7 +371,6 @@ function useFallbackDimensions(sidebarEl) {
 
   sidebarEl.style.width = `${fallbackWidth}px`;
   sidebarEl.style.right = `-${fallbackWidth + 32}px`; // Width plus padding
-  console.log("[DEBUG] Using fallback sidebar width:", fallbackWidth);
 }
 
 function calculateAdditionalWidth(screenWidth) {
@@ -446,8 +393,6 @@ function calculateAdditionalWidth(screenWidth) {
 }
 
 function toggleSidebar(show) {
-  console.log("[DEBUG] Toggling sidebar, show:", show);
-
   const sidebarEl = ensureSidebarExists();
 
   if (show) {
@@ -479,8 +424,6 @@ function showSidebar(sidebarEl) {
     // Make sidebar visible
     sidebarEl.classList.add("visible");
     sidebarVisible = true;
-
-    console.log("[DEBUG] Sidebar now visible");
   }, 50);
 }
 
@@ -495,22 +438,18 @@ function hideSidebar(sidebarEl) {
   // Give animation time to complete before restoring layout
   setTimeout(() => {
     adjustYouTubeLayout(false);
-    console.log("[DEBUG] Layout restored after sidebar hidden");
   }, 300); // Match transition time in CSS
 }
 
 // ===== TRANSCRIPT HANDLING =====
 
 function hideTranscript() {
-  console.log("[DEBUG] Attempting to close YouTube transcript...");
-
   // Look for the transcript close button
   const transcriptCloseButton = document.querySelector(
     "ytd-engagement-panel-section-list-renderer[target-id='engagement-panel-searchable-transcript'] #dismiss-button button"
   );
 
   if (transcriptCloseButton) {
-    console.log("[DEBUG] Found transcript close button, clicking it");
     transcriptCloseButton.click();
     return true;
   } else {
@@ -520,7 +459,6 @@ function hideTranscript() {
     );
 
     if (transcriptPanel) {
-      console.log("[DEBUG] Found transcript panel, attempting to hide it");
       // Check if it has a hidePanel method or similar
       if (
         transcriptPanel.dismissPanel &&
@@ -536,40 +474,31 @@ function hideTranscript() {
       return true;
     }
 
-    console.warn("[DEBUG] Could not find transcript close button or panel");
     return false;
   }
 }
 async function clickMoreButton() {
-  console.log("[DEBUG] clickMoreButton() called.");
-
   const moreButton = document.querySelector(
     "tp-yt-paper-button#expand.button.style-scope.ytd-text-inline-expander"
   );
 
   if (!moreButton) {
-    console.warn("[DEBUG] Could not find the '...more' button (#expand).");
     return false;
   }
 
   moreButton.click();
-  console.log("[DEBUG] Clicked the '...more' button.");
 
   await new Promise((resolve) => setTimeout(resolve, 800));
   return true;
 }
 
 async function clickShowTranscript() {
-  console.log("[DEBUG] clickShowTranscript() called.");
-
   let transcriptBtn = document.querySelector(
     'tp-yt-paper-button[aria-label*="ranscript"], ytd-button-renderer[aria-label*="ranscript"]'
   );
   if (transcriptBtn) {
     transcriptBtn.click();
-    console.log(
-      "[DEBUG] Clicked 'Show transcript' button by aria-label match."
-    );
+
     return true;
   }
 
@@ -581,10 +510,7 @@ async function clickShowTranscript() {
     const text = (item.textContent || "").trim().toLowerCase();
     if (text.includes("transcript")) {
       item.click();
-      console.log(
-        "[DEBUG] Clicked item that contained the text 'transcript':",
-        item
-      );
+
       return true;
     }
   }
@@ -596,21 +522,17 @@ async function clickShowTranscript() {
     );
     if (parentButton) {
       parentButton.click();
-      console.log(
-        "[DEBUG] Clicked parent of .yt-spec-touch-feedback-shape__fill"
-      );
+
       return true;
     }
   }
 
-  console.warn("[DEBUG] 'Show transcript' button not found after expansion.");
   return false;
 }
 
 function getCurrentVideoTimeWindow() {
   const video = document.querySelector("video");
   if (!video) {
-    console.warn("[DEBUG] No video element found");
     return null;
   }
 
@@ -620,9 +542,6 @@ function getCurrentVideoTimeWindow() {
   // If current time is less than 2 minutes, use 0 to currentTime as the window
   // This handles the case where users check early in the video
   if (currentTime < 120) {
-    console.log(
-      "[DEBUG] Video position is less than 2 minutes. Using 0 to current time."
-    );
     return {
       startTime: 0,
       endTime: 120,
@@ -658,21 +577,16 @@ function formatTimeStamp(timeInSeconds) {
   }
 }
 function getYouTubeFullTranscript() {
-  console.log("[DEBUG] Getting full video transcript...");
-
   const transcriptContainer = document.querySelector(
     "ytd-transcript-segment-list-renderer"
   );
   if (!transcriptContainer) {
-    console.warn("[DEBUG] Transcript container NOT found in DOM.");
     return "";
   }
-  console.log("[DEBUG] Transcript container FOUND in DOM.");
 
   const segments = transcriptContainer.querySelectorAll(
     "ytd-transcript-segment-renderer"
   );
-  console.log("[DEBUG] Found", segments.length, "transcript segments.");
 
   let transcriptText = "";
   let segmentCount = 0;
@@ -682,7 +596,6 @@ function getYouTubeFullTranscript() {
       // Extract timestamp from the segment
       const timestampEl = segment.querySelector(".segment-timestamp");
       if (!timestampEl) {
-        console.warn("[DEBUG] No timestamp element found in segment");
         return; // Skip if no timestamp found
       }
 
@@ -701,34 +614,22 @@ function getYouTubeFullTranscript() {
           timestampText
         );
       }
-    } catch (error) {
-      console.error("[DEBUG] Error processing transcript segment:", error);
-    }
+    } catch (error) {}
   });
-
-  console.log(`[DEBUG] Processed ${segmentCount} segments for full transcript`);
-  console.log("[DEBUG] Full transcript text length:", transcriptText.length);
 
   return transcriptText.trim();
 }
 function getYouTubeTranscriptSegment(startTimeSeconds, endTimeSeconds) {
-  console.log(
-    `[DEBUG] Getting transcript segment from ${startTimeSeconds}s to ${endTimeSeconds}s...`
-  );
-
   const transcriptContainer = document.querySelector(
     "ytd-transcript-segment-list-renderer"
   );
   if (!transcriptContainer) {
-    console.warn("[DEBUG] Transcript container NOT found in DOM.");
     return "";
   }
-  console.log("[DEBUG] Transcript container FOUND in DOM.");
 
   const segments = transcriptContainer.querySelectorAll(
     "ytd-transcript-segment-renderer"
   );
-  console.log("[DEBUG] Found", segments.length, "transcript segments.");
 
   let transcriptText = "";
   let segmentCount = 0;
@@ -738,7 +639,6 @@ function getYouTubeTranscriptSegment(startTimeSeconds, endTimeSeconds) {
       // Extract timestamp from the segment
       const timestampEl = segment.querySelector(".segment-timestamp");
       if (!timestampEl) {
-        console.warn("[DEBUG] No timestamp element found in segment");
         return; // Skip if no timestamp found
       }
 
@@ -766,13 +666,8 @@ function getYouTubeTranscriptSegment(startTimeSeconds, endTimeSeconds) {
           );
         }
       }
-    } catch (error) {
-      console.error("[DEBUG] Error processing transcript segment:", error);
-    }
+    } catch (error) {}
   });
-
-  console.log(`[DEBUG] Found ${segmentCount} segments in the time window`);
-  console.log("[DEBUG] Segment transcript text length:", transcriptText.length);
 
   return transcriptText.trim();
 }
@@ -791,7 +686,6 @@ function convertYouTubeTimestampToSeconds(timestamp) {
       // Seconds only (e.g., "42")
       return parts[0];
     } else {
-      console.warn("[DEBUG] Invalid timestamp format:", timestamp);
       return 0;
     }
   } catch (error) {
@@ -808,8 +702,6 @@ function convertYouTubeTimestampToSeconds(timestamp) {
 // ===== CACHE MANAGEMENT =====
 
 function cacheFactCheckResult(videoId, result, factStatus) {
-  console.log("[DEBUG] Caching fact check result for video:", videoId);
-
   // Cache the result in memory
   factCheckCache[videoId] = {
     result: result,
@@ -827,21 +719,14 @@ function cacheFactCheckResult(videoId, result, factStatus) {
           timestamp: Date.now(),
         },
       },
-      function () {
-        console.log("[DEBUG] Fact check saved to persistent storage");
-      }
+      function () {}
     );
-  } catch (error) {
-    console.error("[DEBUG] Error saving to storage:", error);
-  }
+  } catch (error) {}
 }
 
 async function getCachedFactCheck(videoId) {
-  console.log("[DEBUG] Checking for cached fact check for video:", videoId);
-
   // First check in-memory cache
   if (factCheckCache[videoId]) {
-    console.log("[DEBUG] Found in-memory cache for video:", videoId);
     return factCheckCache[videoId];
   }
 
@@ -850,17 +735,14 @@ async function getCachedFactCheck(videoId) {
     try {
       chrome.storage.local.get([`factCheck_${videoId}`], function (result) {
         if (result[`factCheck_${videoId}`]) {
-          console.log("[DEBUG] Found cached fact check in storage");
           // Store in memory cache for faster future access
           factCheckCache[videoId] = result[`factCheck_${videoId}`];
           resolve(result[`factCheck_${videoId}`]);
         } else {
-          console.log("[DEBUG] No cached fact check found");
           resolve(null);
         }
       });
     } catch (error) {
-      console.error("[DEBUG] Error accessing storage:", error);
       resolve(null);
     }
   });
@@ -894,29 +776,6 @@ function displayCachedFactCheck(cachedData) {
   addDisclaimerToSidebar();
 }
 
-function clearFactCheckCache() {
-  // Clear in-memory cache
-  Object.keys(factCheckCache).forEach((key) => {
-    delete factCheckCache[key];
-  });
-
-  // Clear storage cache
-  chrome.storage.local.get(null, function (items) {
-    const keysToRemove = Object.keys(items).filter((key) =>
-      key.startsWith("factCheck_")
-    );
-    if (keysToRemove.length > 0) {
-      chrome.storage.local.remove(keysToRemove, function () {
-        console.log(
-          "[DEBUG] Cleared",
-          keysToRemove.length,
-          "cached fact checks from storage"
-        );
-      });
-    }
-  });
-}
-
 function manageCacheSize(maxEntries = 20) {
   chrome.storage.local.get(null, function (items) {
     const factCheckKeys = Object.keys(items).filter((key) =>
@@ -942,13 +801,7 @@ function manageCacheSize(maxEntries = 20) {
       .map((entry) => entry.key);
 
     if (keysToRemove.length > 0) {
-      chrome.storage.local.remove(keysToRemove, function () {
-        console.log(
-          "[DEBUG] Removed",
-          keysToRemove.length,
-          "oldest cache entries"
-        );
-      });
+      chrome.storage.local.remove(keysToRemove, function () {});
     }
   });
 }
@@ -986,18 +839,14 @@ async function callGoogleGenAIStream(
     });
 
     ws.onopen = () => {
-      console.log("WebSocket connection established.");
       ws.send(JSON.stringify({ setup: config }));
     };
 
     ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
       reject(error);
     };
 
-    ws.onclose = (event) => {
-      console.log("WebSocket connection closed:", event);
-    };
+    ws.onclose = (event) => {};
 
     ws.onmessage = async (event) => {
       // Abort if the context is no longer active or if the document is hidden.
@@ -1028,7 +877,6 @@ async function callGoogleGenAIStream(
           const serverContent = response.serverContent;
 
           if (serverContent.interrupted) {
-            console.warn("Server interrupted generation.");
             ws.close();
             reject(new Error("Server interrupted generation."));
             return;
@@ -1055,11 +903,8 @@ async function callGoogleGenAIStream(
             resolve(accumulatedText);
           }
         } else {
-          console.log("Received an unrecognized message:", response);
         }
-      } catch (error) {
-        console.error("Error processing message:", error);
-      }
+      } catch (error) {}
     };
   });
 }
@@ -1183,10 +1028,6 @@ function addSourceCitationToSidebar(sourceText) {
   }
 }
 async function processSegmentFactCheck(timeWindow, userApiKey, videoId) {
-  console.log(
-    `[DEBUG] Processing fact check for ${timeWindow.formattedStart} to ${timeWindow.formattedEnd}`
-  );
-
   // Initialize the enhanced sidebar with loading state
   sidebar.innerHTML = `
     <button id="sidebar-close" aria-label="Close Sidebar">&times;</button>
@@ -1253,10 +1094,6 @@ async function processSegmentFactCheck(timeWindow, userApiKey, videoId) {
     }
   }
 
-  console.log(
-    `[DEBUG] Using transcript segment with length: ${transcript.length}`
-  );
-
   const userPrompt = `# FACT-CHECKING YOUTUBE VIDEO SEGMENT
 
 Analyze this transcript segment from ${timeWindow.formattedStart} to ${timeWindow.formattedEnd} in the video.
@@ -1306,15 +1143,10 @@ IMPORTANT:
   // Define the callback to update the UI with each incoming chunk
   const onPartialUpdate = (accumulatedText, isFinal = false) => {
     // Debug the fact-checking status to see why it's being set to false
-    console.log(
-      "[DEBUG] onPartialUpdate called, factCheckingInProgress:",
-      factCheckingInProgress
-    );
 
     // Skip updates only if the extension is no longer active or if we're purposely stopping
     // DO NOT check factCheckingInProgress here as it might be set to false prematurely
     if (!isActive) {
-      console.log("[DEBUG] Extension no longer active, skipping update");
       return;
     }
 
@@ -1327,11 +1159,6 @@ IMPORTANT:
       return;
     }
 
-    console.log(
-      "[DEBUG] Updating UI with text chunk, length:",
-      accumulatedText.length
-    );
-
     // Remove loading class once we start getting content
     resultDiv.classList.remove("loading");
 
@@ -1340,7 +1167,6 @@ IMPORTANT:
     let currentStatus;
     if (isFinal) {
       currentStatus = determineFactStatus(accumulatedText);
-      console.log("[DEBUG] Final update, fact status:", currentStatus);
     } else {
       currentStatus = determineFactStatus(accumulatedText);
     }
@@ -1357,7 +1183,6 @@ IMPORTANT:
 
     // If this is the final update, reprocess the entire markdown for clean rendering
     if (isFinal) {
-      console.log("[DEBUG] Final response received, refreshing markdown");
       resultDiv.innerHTML = statusHtml + marked.parse(accumulatedText);
     } else {
       // For streaming updates, render as we go
@@ -1372,7 +1197,6 @@ IMPORTANT:
       userPrompt,
       onPartialUpdate
     );
-    console.log("[DEBUG] LLM call complete. Sidebar updated.");
 
     // Reset the fact checking status
     factCheckingInProgress = false;
@@ -1382,7 +1206,6 @@ IMPORTANT:
     }
 
     if (finalText && finalText.length >= 100) {
-      console.log("[DEBUG] Response length sufficient, caching result");
       // Modify the cache key to include segment information
       const segmentCacheKey = `${videoId}_segment_${timeWindow.formattedStart}_${timeWindow.formattedEnd}`;
       cacheFactCheckResult(segmentCacheKey, finalText, currentFactStatus);
@@ -1421,13 +1244,10 @@ IMPORTANT:
       <p>Error: ${error.message}</p>
       <p>Please try again or check your API key configuration.</p>
     `;
-    console.error("[DEBUG] Error calling LLM:", error);
   }
 }
 
 async function processFullVideoFactCheck(userApiKey, videoId) {
-  console.log(`[DEBUG] Processing fact check for entire video`);
-
   // Get video title for a more personalized analysis
   const videoTitle =
     document.querySelector("h1.ytd-watch-metadata yt-formatted-string")
@@ -1460,7 +1280,6 @@ async function processFullVideoFactCheck(userApiKey, videoId) {
   const fullVideoKey = `${videoId}_full`; // Add _full suffix to distinguish from segment checks
   const cachedResult = await getCachedFactCheck(fullVideoKey);
   if (cachedResult) {
-    console.log("[DEBUG] Using cached full video fact check result");
     factCheckingInProgress = false;
     clearTimeout(factCheckTimeoutId); // Clear the timeout since we have a result
     factCheckTimeoutId = null;
@@ -1481,18 +1300,11 @@ async function processFullVideoFactCheck(userApiKey, videoId) {
     return;
   }
 
-  console.log(
-    `[DEBUG] Using full transcript with length: ${transcript.length}`
-  );
-
   // Check if transcript is too long and needs truncation
   let processedTranscript = transcript;
-  const MAX_TRANSCRIPT_LENGTH = 15000; // About 15k chars to stay within API limits
+  const MAX_TRANSCRIPT_LENGTH = 100000; // About 15k chars to stay within API limits
 
   if (transcript.length > MAX_TRANSCRIPT_LENGTH) {
-    console.log(
-      `[DEBUG] Transcript too long (${transcript.length} chars), truncating to ${MAX_TRANSCRIPT_LENGTH}`
-    );
     processedTranscript = transcript.substring(0, MAX_TRANSCRIPT_LENGTH);
 
     // Add note to UI about truncation
@@ -1557,14 +1369,9 @@ IMPORTANT:
   // Define the callback to update the UI with each incoming chunk
   const onPartialUpdate = (accumulatedText, isFinal = false) => {
     // Debug the fact-checking status
-    console.log(
-      "[DEBUG] onPartialUpdate called, factCheckingInProgress:",
-      factCheckingInProgress
-    );
 
     // Skip updates only if the extension is no longer active
     if (!isActive) {
-      console.log("[DEBUG] Extension no longer active, skipping update");
       return;
     }
 
@@ -1577,11 +1384,6 @@ IMPORTANT:
       return;
     }
 
-    console.log(
-      "[DEBUG] Updating UI with text chunk, length:",
-      accumulatedText.length
-    );
-
     // Remove loading class once we start getting content
     resultDiv.classList.remove("loading");
 
@@ -1589,7 +1391,6 @@ IMPORTANT:
     let currentStatus;
     if (isFinal) {
       currentStatus = determineFactStatus(accumulatedText);
-      console.log("[DEBUG] Final update, fact status:", currentStatus);
     } else {
       currentStatus = determineFactStatus(accumulatedText);
     }
@@ -1609,7 +1410,6 @@ IMPORTANT:
 
     // If this is the final update, reprocess the entire markdown for clean rendering
     if (isFinal) {
-      console.log("[DEBUG] Final response received, refreshing markdown");
       resultDiv.innerHTML = statusHtml + marked.parse(accumulatedText);
     } else {
       // For streaming updates, render as we go
@@ -1624,7 +1424,6 @@ IMPORTANT:
       userPrompt,
       onPartialUpdate
     );
-    console.log("[DEBUG] LLM call complete for full video. Sidebar updated.");
 
     // Reset the fact checking status
     factCheckingInProgress = false;
@@ -1634,7 +1433,6 @@ IMPORTANT:
     }
 
     if (finalText && finalText.length >= 200) {
-      console.log("[DEBUG] Response length sufficient, caching result");
       cacheFactCheckResult(`${videoId}_full`, finalText, currentFactStatus);
 
       // Ensure the final result is visible with a forced update
@@ -1655,7 +1453,6 @@ IMPORTANT:
 
       // Force a final update
       factCheckResultDiv.innerHTML = statusHtml + marked.parse(finalText);
-      console.log("[DEBUG] Forced final update to sidebar content");
     } else {
       console.warn(
         "[DEBUG] Response too short (length: " +
@@ -1682,7 +1479,6 @@ IMPORTANT:
       <p>Error: ${error.message}</p>
       <p>Please try again or check your API key configuration.</p>
     `;
-    console.error("[DEBUG] Error calling LLM for full video:", error);
   }
 }
 // ===== BUTTON INJECTION =====
@@ -1693,18 +1489,14 @@ IMPORTANT:
  * @returns {boolean} - Whether injection was successful
  */
 function injectFactCheckButton() {
-  console.log("[DEBUG] Injecting fact check button...");
-
   // If the button already exists, don't add another.
   if (document.querySelector(".my-custom-button")) {
-    console.log("[DEBUG] Button already exists, not adding another one.");
     return true;
   }
 
   // Look for the control bar.
   const controlBar = document.querySelector(".ytp-left-controls");
   if (!controlBar) {
-    console.log("[DEBUG] Control bar not found yet");
     buttonInjectionAttempts++;
     if (buttonInjectionAttempts >= MAX_INJECTION_ATTEMPTS) {
       console.warn(
@@ -1717,7 +1509,6 @@ function injectFactCheckButton() {
     return false;
   }
 
-  console.log("[DEBUG] Control bar found. Inserting custom button...");
   try {
     // Create a container (flex) to host our custom button and dropdown
     const container = document.createElement("div");
@@ -1843,11 +1634,9 @@ function injectFactCheckButton() {
     // Toggle dropdown on button click
     button.addEventListener("click", (e) => {
       e.stopPropagation(); // Prevent event bubbling
-      console.log("[DEBUG] Fact check button clicked");
 
       // If sidebar is visible, just hide it
       if (sidebarVisible) {
-        console.log("[DEBUG] Sidebar is visible, hiding it");
         toggleSidebar(false); // Hides sidebar
 
         // Cancel any ongoing fact check
@@ -1862,11 +1651,10 @@ function injectFactCheckButton() {
       }
 
       // Toggle dropdown visibility
-      console.log("[DEBUG] Toggling dropdown");
+
       const isVisible = dropdown.style.display !== "none";
       if (isVisible) {
         dropdown.style.display = "none";
-        console.log("[DEBUG] Hiding dropdown");
       } else {
         // First, make sure the dropdown is visible before positioning it
         dropdown.style.display = "block";
@@ -1874,34 +1662,11 @@ function injectFactCheckButton() {
 
         // Position the dropdown relative to the button
         positionDropdown(button, dropdown);
-        console.log(
-          "[DEBUG] Showing dropdown, display:",
-          dropdown.style.display
-        );
-
-        // Add a check to verify dropdown visibility after a short delay
-        setTimeout(() => {
-          console.log(
-            "[DEBUG] Dropdown display after delay:",
-            dropdown.style.display
-          );
-          console.log(
-            "[DEBUG] Dropdown opacity after delay:",
-            dropdown.style.opacity
-          );
-          console.log(
-            "[DEBUG] Dropdown position:",
-            dropdown.style.left,
-            dropdown.style.bottom
-          );
-          console.log("[DEBUG] Dropdown z-index:", dropdown.style.zIndex);
-        }, 100);
       }
     });
 
     // Function to position the dropdown properly
     function positionDropdown(buttonEl, dropdownEl) {
-      console.log("[DEBUG] Positioning dropdown");
       const buttonRect = buttonEl.getBoundingClientRect();
 
       // Calculate the center position of the button
@@ -1926,13 +1691,6 @@ function injectFactCheckButton() {
         "style",
         dropdownEl.getAttribute("style") + "; z-index: 6000 !important;"
       );
-
-      console.log(
-        "[DEBUG] Dropdown positioned at left:",
-        dropdownEl.style.left,
-        "bottom:",
-        dropdownEl.style.bottom
-      );
     }
 
     fullCheckOption.addEventListener("click", async () => {
@@ -1941,7 +1699,6 @@ function injectFactCheckButton() {
       // Get the current video ID
       const videoId = getYouTubeVideoId();
       if (!videoId) {
-        console.warn("[DEBUG] Could not determine video ID");
         return;
       }
 
@@ -1961,7 +1718,6 @@ function injectFactCheckButton() {
       // Start a new timeout for this fact check attempt (maybe longer for full videos)
       factCheckTimeoutId = setTimeout(() => {
         if (factCheckingInProgress) {
-          console.log("[DEBUG] Full video fact check timeout reached.");
           factCheckingInProgress = false;
           factCheckTimeoutId = null;
 
@@ -2000,14 +1756,12 @@ function injectFactCheckButton() {
       // Get the current time window
       const timeWindow = getCurrentVideoTimeWindow();
       if (!timeWindow) {
-        console.warn("[DEBUG] Could not determine current video time");
         return;
       }
 
       // Get the current video ID
       const videoId = getYouTubeVideoId();
       if (!videoId) {
-        console.warn("[DEBUG] Could not determine video ID");
         return;
       }
 
@@ -2029,7 +1783,6 @@ function injectFactCheckButton() {
       // Start a new timeout for this fact check attempt
       factCheckTimeoutId = setTimeout(() => {
         if (factCheckingInProgress) {
-          console.log("[DEBUG] Segment fact check timeout reached.");
           factCheckingInProgress = false;
           factCheckTimeoutId = null;
 
@@ -2065,7 +1818,6 @@ function injectFactCheckButton() {
     // Close dropdown when clicking outside
     document.addEventListener("click", (e) => {
       if (!container.contains(e.target) && dropdown.style.display !== "none") {
-        console.log("[DEBUG] Clicking outside dropdown, hiding it");
         dropdown.style.display = "none";
       }
     });
@@ -2073,7 +1825,6 @@ function injectFactCheckButton() {
     // Also handle escape key to close dropdown
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && dropdown.style.display !== "none") {
-        console.log("[DEBUG] Escape key pressed, hiding dropdown");
         dropdown.style.display = "none";
       }
     });
@@ -2084,12 +1835,9 @@ function injectFactCheckButton() {
 
     // Simply append to the control bar as before
     controlBar.appendChild(container);
-    console.log("[DEBUG] Custom button appended to controls");
 
-    console.log("[DEBUG] Custom button with dropdown inserted!");
     return true;
   } catch (err) {
-    console.error("[DEBUG] injectFactCheckButton error:", err);
     return false;
   }
 }
@@ -2108,8 +1856,6 @@ function resetButtonInjectionState() {
  * Streamlined navigation detection and button injection
  */
 function setupNavigationDetection() {
-  console.log("[DEBUG] Setting up enhanced navigation detection...");
-
   // Monitor YouTube layout changes for sidebar adjustments
   monitorLayoutChanges();
 
@@ -2121,7 +1867,6 @@ function setupNavigationDetection() {
       const playerControls = document.querySelector(".ytp-left-controls");
 
       if (videoElement && playerControls && isVideoPage()) {
-        console.log("[DEBUG] Video and controls detected via MutationObserver");
         setTimeout(() => injectFactCheckButton(), 500); // Short delay to ensure UI is ready
       }
     }
@@ -2137,19 +1882,16 @@ function setupNavigationDetection() {
       childList: true,
       subtree: true,
     });
-    console.log("[DEBUG] MutationObserver set up on", observeTarget.tagName);
   }
 
   // Primary event listeners for YouTube navigation
   document.addEventListener("yt-navigate-start", () => {
-    console.log("[DEBUG] yt-navigate-start event detected");
     isActive = false; // Cancel pending asynchronous tasks
     resetUI();
     resetButtonInjectionState();
   });
 
   document.addEventListener("yt-navigate-finish", () => {
-    console.log("[DEBUG] yt-navigate-finish event detected");
     isActive = true; // Reset cancellation flag for new page
 
     // Use a single delayed injection attempt after navigation
@@ -2160,7 +1902,6 @@ function setupNavigationDetection() {
 
   // Backup: Listen for player updates
   document.addEventListener("yt-player-updated", () => {
-    console.log("[DEBUG] yt-player-updated event detected");
     if (isVideoPage()) {
       injectFactCheckButton();
     }

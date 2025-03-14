@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Youtube FactCheck",
   "version": "1.0",
-  "description": "Adds a factchecking feature to youtube videos.",
+  "description": "Adds AI-powered fact-checking features to YouTube videos to help verify information.",
   "icons": {
     "16": "images/icon16.png",
     "48": "images/icon48.png",
@@ -11,15 +11,21 @@
   "background": {
     "service_worker": "background.js"
   },
-  "permissions": ["storage", "activeTab", "scripting", "clipboardRead"],
-  "host_permissions": ["https://generativelanguage.googleapis.com/*"],
+  "permissions": ["storage", "activeTab", "clipboardRead"],
+  "host_permissions": [
+    "https://*.youtube.com/*",
+    "https://generativelanguage.googleapis.com/*"
+  ],
   "action": {
     "default_popup": "popup.html"
   },
   "content_scripts": [
     {
-      "matches": ["https://*.youtube.com/*"],
-      "js": ["content.js", "marked.min.js"],
+      "matches": [
+        "https://*.youtube.com/*",
+        "https://www.youtube-nocookie.com/embed/*"
+      ],
+      "js": ["marked.min.js", "content.js"],
       "css": ["styles.css"],
       "run_at": "document_start"
     }
@@ -29,5 +35,7 @@
       "resources": ["icons/*"],
       "matches": ["https://*.youtube.com/*"]
     }
-  ]
+  ],
+  "author": "Angus Kekwick",
+  "homepage_url": "https://buymeacoffee.com/angusdev"
 }
