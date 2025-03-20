@@ -11,7 +11,8 @@ let isActive = true;
 const factCheckCache = {};
 let sidebar;
 let sidebarVisible = false;
-
+let buttonInjectionAttempts = 0;
+const MAX_INJECTION_ATTEMPTS = 1;
 let factCheckingInProgress = false;
 let factCheckTimeoutId = null;
 const FACT_CHECK_TIMEOUT = 35000; // 30 seconds timeout
@@ -609,10 +610,6 @@ function getYouTubeFullTranscript() {
         transcriptText += `[${timestampText}] ${textEl.textContent.trim()} `;
         segmentCount++;
       } else {
-        console.warn(
-          "[DEBUG] No text element found for segment at timestamp",
-          timestampText
-        );
       }
     } catch (error) {}
   });
@@ -660,10 +657,6 @@ function getYouTubeTranscriptSegment(startTimeSeconds, endTimeSeconds) {
           transcriptText += `[${timestampText}] ${textEl.textContent.trim()} `;
           segmentCount++;
         } else {
-          console.warn(
-            "[DEBUG] No text element found for segment at timestamp",
-            timestampText
-          );
         }
       }
     } catch (error) {}
@@ -689,12 +682,6 @@ function convertYouTubeTimestampToSeconds(timestamp) {
       return 0;
     }
   } catch (error) {
-    console.error(
-      "[DEBUG] Error converting timestamp:",
-      error,
-      "for timestamp:",
-      timestamp
-    );
     return 0;
   }
 }
@@ -850,7 +837,7 @@ async function callGoogleGenAIStream(
 
     ws.onmessage = async (event) => {
       // Abort if the context is no longer active or if the document is hidden.
-      if (!isActive || document.hidden) {
+      if (!isActive) {
         ws.close();
         return;
       }
@@ -1049,7 +1036,7 @@ async function processSegmentFactCheck(timeWindow, userApiKey, videoId) {
   await clickShowTranscript();
 
   // Wait a bit for transcript to load
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  await new Promise((resolve) => setTimeout(resolve, 2000));
 
   // Try to get the transcript segment using our improved function
   const transcript = getYouTubeTranscriptSegment(
@@ -1070,9 +1057,6 @@ async function processSegmentFactCheck(timeWindow, userApiKey, videoId) {
 
   // If the transcript is too short, it might be a parsing issue - try to get the full transcript as backup
   if (transcript.length < 25) {
-    console.warn(
-      "[DEBUG] Transcript segment is suspiciously short. Getting full transcript as backup."
-    );
     const fullTranscript = getYouTubeTranscript();
 
     factCheckResultDiv.innerHTML = `
@@ -1153,9 +1137,6 @@ IMPORTANT:
     // Make sure element still exists
     const resultDiv = document.getElementById("fact-check-result");
     if (!resultDiv) {
-      console.error(
-        "[DEBUG] fact-check-result element not found during update"
-      );
       return;
     }
 
@@ -1210,11 +1191,6 @@ IMPORTANT:
       const segmentCacheKey = `${videoId}_segment_${timeWindow.formattedStart}_${timeWindow.formattedEnd}`;
       cacheFactCheckResult(segmentCacheKey, finalText, currentFactStatus);
     } else {
-      console.warn(
-        "[DEBUG] Response too short (length: " +
-          (finalText ? finalText.length : 0) +
-          "), not caching"
-      );
     }
 
     // Add source citation section if not already present
@@ -1274,7 +1250,7 @@ async function processFullVideoFactCheck(userApiKey, videoId) {
   await clickShowTranscript();
 
   // Wait a bit for transcript to load
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  await new Promise((resolve) => setTimeout(resolve, 2000));
 
   // Check if we have a cached result
   const fullVideoKey = `${videoId}_full`; // Add _full suffix to distinguish from segment checks
@@ -1378,9 +1354,6 @@ IMPORTANT:
     // Make sure element still exists
     const resultDiv = document.getElementById("fact-check-result");
     if (!resultDiv) {
-      console.error(
-        "[DEBUG] fact-check-result element not found during update"
-      );
       return;
     }
 
@@ -1454,11 +1427,6 @@ IMPORTANT:
       // Force a final update
       factCheckResultDiv.innerHTML = statusHtml + marked.parse(finalText);
     } else {
-      console.warn(
-        "[DEBUG] Response too short (length: " +
-          (finalText ? finalText.length : 0) +
-          "), not caching"
-      );
     }
 
     // Add source citation
@@ -1499,9 +1467,6 @@ function injectFactCheckButton() {
   if (!controlBar) {
     buttonInjectionAttempts++;
     if (buttonInjectionAttempts >= MAX_INJECTION_ATTEMPTS) {
-      console.warn(
-        "[DEBUG] Max injection attempts reached. Giving up for now."
-      );
       return false;
     }
     // Try again after a short delay.

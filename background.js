@@ -1,4 +1,4 @@
-// background.js - Create this file to handle the installation event
+// background.js - This file is needed to handle the installation event
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === "install") {
     // Open the guide.html page when the extension is first installed
